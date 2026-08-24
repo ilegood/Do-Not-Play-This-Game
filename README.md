@@ -141,5 +141,3 @@ do-not-play-this-game/
 3. **`시작 (PLAY)`** 버튼을 누르고 날아오는 탄막과 컴퓨터의 방해를 피해 살아남으세요!
 
 ---
-
-*© 2026 DO NOT PLAY THIS GAME Team. Designed for Retro Gaming & Hackathon Presentation.*
