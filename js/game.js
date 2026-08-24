@@ -956,12 +956,35 @@ Rank S Comment: ${getLoc('ranks', 'S')}
   updateDebugToolkit() {
     if (!this.debugWindow || this.debugWindow.style.display === 'none') return;
 
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    const stateMap = {
+      'NORMAL_BULLETS': isKo ? '일반 탄막 구간' : 'NORMAL_BULLETS',
+      'EVENT_WARNING': isKo ? '이벤트 경고 중' : 'EVENT_WARNING',
+      'EVENT_ACTIVE': isKo ? '이벤트 진행 중' : 'EVENT_ACTIVE',
+      'EVENT_CLEAR': isKo ? '이벤트 돌파 완료' : 'EVENT_CLEAR'
+    };
+
+    const diffMap = {
+      'EASY': isKo ? '쉬움' : 'EASY',
+      'NORMAL': isKo ? '보통' : 'NORMAL',
+      'HARD': isKo ? '어려움' : 'HARD'
+    };
+
+    const statusMap = {
+      'READY': isKo ? '대기' : 'READY',
+      'ACTIVE': isKo ? '실행 중' : 'ACTIVE',
+      'ENDING': isKo ? '종료 중' : 'ENDING',
+      'ERROR': isKo ? '오류' : 'ERROR',
+      'INACTIVE': isKo ? '없음' : 'INACTIVE'
+    };
+
     // Director Status
     const dState = document.getElementById('dbg-director-state');
     const dNext = document.getElementById('dbg-director-next');
     const dSurvived = document.getElementById('dbg-director-survived');
 
-    if (dState) dState.textContent = this.director.state;
+    if (dState) dState.textContent = stateMap[this.director.state] || this.director.state;
     if (dNext) dNext.textContent = `${Math.max(0, this.director.stateTimer).toFixed(1)}s`;
     if (dSurvived) dSurvived.textContent = `${this.director.survivedEventsCount}`;
 
@@ -971,15 +994,22 @@ Rank S Comment: ${getLoc('ranks', 'S')}
     const eTime = document.getElementById('dbg-active-event-time');
     const eDiff = document.getElementById('dbg-active-event-diff');
 
-    if (eName) eName.textContent = info.hasActive ? info.name : 'None';
+    if (eName) {
+      if (info.hasActive) {
+        const localizedActiveName = getLoc('events', info.id, 'name') || info.name;
+        eName.textContent = localizedActiveName;
+      } else {
+        eName.textContent = isKo ? '없음' : 'None';
+      }
+    }
     if (eTime) eTime.textContent = `${info.elapsed} / ${info.duration}`;
-    if (eDiff) eDiff.textContent = info.difficulty;
+    if (eDiff) eDiff.textContent = diffMap[info.difficulty] || info.difficulty;
 
     // Table rows active status
     if (this.director.lastEventId) {
       const badge = document.getElementById(`dbg-status-${this.director.lastEventId}`);
       if (badge) {
-        badge.textContent = info.status;
+        badge.textContent = statusMap[info.status] || info.status;
         badge.className = `dbg-status-badge ${info.status === 'ACTIVE' ? 'badge-active' : (info.status === 'ENDING' ? 'badge-ending' : (info.status === 'ERROR' ? 'badge-error' : 'badge-ready'))}`;
       }
     }
@@ -1031,9 +1061,10 @@ Rank S Comment: ${getLoc('ranks', 'S')}
 
     if (btnClose) {
       btnClose.addEventListener('click', () => {
+        const isKo = currentLanguage === 'ko';
         this.showRetroDialog(
-          "ACCESS DENIED",
-          "You cannot close this program while bullets are active.",
+          isKo ? "접근 거부" : "ACCESS DENIED",
+          isKo ? "탄막 프로세스가 활성화된 상태에서는 프로그램을 종료할 수 없습니다." : "You cannot close this program while bullets are active.",
           "🛑"
         );
       });
@@ -1297,6 +1328,33 @@ Rank S Comment: ${getLoc('ranks', 'S')}
       if (bulletPatSelect.options[5]) bulletPatSelect.options[5].text = isKo ? '바운딩 오류창' : 'Bouncing Error';
     }
 
+    // Event Diff Select Dropdown
+    const eventDiffSelect = document.getElementById('dbg-event-diff-select');
+    if (eventDiffSelect) {
+      const isKo = currentLanguage === 'ko';
+      if (eventDiffSelect.options[0]) eventDiffSelect.options[0].text = isKo ? '쉬움 (EASY)' : 'EASY';
+      if (eventDiffSelect.options[1]) eventDiffSelect.options[1].text = isKo ? '보통 (NORMAL)' : 'NORMAL';
+      if (eventDiffSelect.options[2]) eventDiffSelect.options[2].text = isKo ? '어려움 (HARD)' : 'HARD';
+    }
+
+    // Window Menubar Items
+    const menuFile = document.getElementById('menu-file');
+    if (menuFile) menuFile.innerHTML = currentLanguage === 'ko' ? '파일(<u>F</u>)' : '<u>F</u>ile';
+
+    const menuOptions = document.getElementById('menu-options');
+    if (menuOptions) menuOptions.innerHTML = currentLanguage === 'ko' ? '옵션(<u>O</u>)' : '<u>O</u>ptions';
+
+    const menuHelp = document.getElementById('menu-help');
+    if (menuHelp) menuHelp.innerHTML = currentLanguage === 'ko' ? '도움말(<u>H</u>)' : '<u>H</u>elp';
+
+    // Boot Skip Hint
+    const bootSkip = document.getElementById('boot-skip-hint');
+    if (bootSkip) bootSkip.textContent = getLoc('boot', 'skip');
+
+    // Countdown Subtext
+    const countSub = document.getElementById('countdown-subtext');
+    if (countSub) countSub.textContent = currentLanguage === 'ko' ? 'WASD: 이동' : 'WASD: MOVE';
+
     // Desktop Icons & Taskbar
     const iconTrash = document.getElementById('icon-label-trash');
     if (iconTrash) iconTrash.textContent = getLoc('desktop', 'recycleBin');
@@ -1492,7 +1550,7 @@ Rank S Comment: ${getLoc('ranks', 'S')}
     if (iconReadme) {
       iconReadme.addEventListener('dblclick', () => {
         const readmeText = currentLanguage === 'ko'
-          ? "1. 이 게임을 하지 마십시오.<br>2. 지속적인 탄막 생존: 계속해서 탄막을 피하세요!<br>3. 방해 이벤트 발생 시 빠르게 적응하여 움직이세요.<br>4. 연속 돌파를 쌓고 가능한 오래 생존하십시오.<br>5. 행운을 빕니다."
+          ? "1. 이 프로그램을 실행하지 마십시오.<br>2. 지속 탄막 생존: 끊임없이 날아오는 탄막을 회피하십시오.<br>3. 시스템 방해 공작 발생 시 침착하게 상황을 파악하고 대피하십시오.<br>4. 연속 돌파 기록을 수립하며 가능한 오래 버티십시오.<br>5. 당신의 건투를 빌지 않습니다."
           : "1. Do NOT play this game.<br>2. Continuous bullet-hell survival: Keep dodging bullets!<br>3. When interference events occur, adapt and keep moving.<br>4. Build your streak and survive as long as possible.<br>5. Good luck.";
         this.showRetroDialog(
           "DO_NOT_OPEN.TXT",
@@ -1654,7 +1712,7 @@ Rank S Comment: ${getLoc('ranks', 'S')}
   onPlayerHit() {
     this.streak = 0;
     if (this.hudStatusMsg) {
-      this.hudStatusMsg.textContent = currentLanguage === 'ko' ? '피격! 연속 돌파 초기화' : 'HIT! STREAK RESET';
+      this.hudStatusMsg.textContent = currentLanguage === 'ko' ? '피격되었습니다. 연속 기록 초기화' : 'HIT! STREAK RESET';
     }
     this.updateHUD();
   }
@@ -1974,8 +2032,11 @@ Rank S Comment: ${getLoc('ranks', 'S')}
       this.director.drawBackground(this.ctx);
     }
 
-    // 5. Draw Subsystems (Hazards, Items, Player, Director Post-effects)
+    // 5. Draw Subsystems (Floor Layer, Hazards, Items, Player, Director Post-effects)
     if (this.state === 'PLAYING' || this.state === 'PAUSED' || this.state === 'DYING' || this.state === 'GAMEOVER') {
+      if (this.director && typeof this.director.drawFloor === 'function') {
+        this.director.drawFloor(this.ctx);
+      }
       this.hazards.draw(this.ctx);
       this.player.draw(this.ctx);
       this.director.draw(this.ctx);

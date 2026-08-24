@@ -45,6 +45,18 @@ class Player {
     this.isBlinking = false;
   }
 
+  get isAlive() {
+    return this.hp > 0;
+  }
+
+  get isInvulnerable() {
+    return this.invulnerable;
+  }
+
+  get radius() {
+    return this.hitboxSize / 2;
+  }
+
   reset() {
     this.x = this.arenaWidth / 2;
     this.y = this.arenaHeight / 2;

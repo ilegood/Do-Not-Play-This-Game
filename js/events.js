@@ -69,6 +69,10 @@ class BaseInterferenceEvent {
 
   onEnd() {}
 
+  drawBackground(ctx) {}
+
+  drawFloor(ctx) {}
+
   draw(ctx) {}
 
   reset() {
@@ -521,10 +525,11 @@ class UIInvasionEvent extends BaseInterferenceEvent {
     const count = this.difficulty === 'HARD' ? 3 : (this.difficulty === 'EASY' ? 1 : 2);
     this.boxes = [];
 
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
     for (let i = 0; i < count; i++) {
       const bx = 120 + (i * 180);
       const by = 100 + (i * 90);
-      this.boxes.push({ x: bx, y: by, w: 90, h: 60, title: `DIALOG_${i + 1}.EXE` });
+      this.boxes.push({ x: bx, y: by, w: 90, h: 60, title: isKo ? `대화상자_${i + 1}.EXE` : `DIALOG_${i + 1}.EXE` });
     }
   }
 
@@ -667,88 +672,267 @@ class ColorErrorEvent extends BaseInterferenceEvent {
 }
 
 // -------------------------------------------------------------
-// EVENT 14: TITLE BAR DROP (SPACE)
-// -------------------------------------------------------------
-class TitleBarDropEvent extends BaseInterferenceEvent {
-  constructor() {
-    super({
-      id: 'title_bar_drop',
-      name: 'Title Bar Drop',
-      category: 'SPACE',
-      warningType: 'SPACE CORRUPTION',
-      duration: 5.5,
-      instruction: 'TITLE BAR DETACHED!'
-    });
-    this.barEl = document.getElementById('title-drop-obstacle');
-  }
-
-  start(director, player, hazards) {
-    super.start(director, player, hazards);
-    if (this.barEl) {
-      this.barEl.style.display = 'block';
-      this.barEl.style.top = this.difficulty === 'HARD' ? '180px' : '120px';
-    }
-  }
-
-  onEnd() {
-    if (this.barEl) this.barEl.style.display = 'none';
-  }
-}
-
-// -------------------------------------------------------------
-// EVENT 15: TASKBAR MALFUNCTION (SPACE)
-// Bullet safety: constrains bullet bounds to above taskbar
+// EVENT 08: TASKBAR OVERFLOW / MALFUNCTION (SPACE)
+// Corrupted Windows 98 Taskbars multiply and stack upward like a buffer overflow,
+// shrinking playable arena space and shocking players submerged in the glitch stack!
 // -------------------------------------------------------------
 class TaskbarMalfunctionEvent extends BaseInterferenceEvent {
   constructor() {
     super({
       id: 'taskbar_malfunction',
-      name: 'Taskbar Malfunction',
+      name: 'Taskbar Overflow',
       category: 'SPACE',
       warningType: 'SPACE CORRUPTION',
-      duration: 5.5,
-      instruction: 'TASKBAR EXPANDING UPWARD!'
+      duration: 6.5,
+      instruction: 'TASKBAR OVERFLOW: EVACUATE UPWARD'
     });
-    this.taskbarEl = document.getElementById('taskbar-rise-overlay');
-    this.riseHeight = 70;
+    this.currentRise = 0;
+    this.maxRise = 190;
+    this.glitchParticles = [];
+    this.submergedDamageTimer = 0;
   }
 
   getBulletModifier() {
     return {
-      spawnBounds: {
-        minX: 0,
-        maxX: 640,
-        minY: 0,
-        maxY: 440 - this.riseHeight
-      }
+      densityMultiplier: 0.70,
+      speedMultiplier: 0.85
     };
   }
 
   start(director, player, hazards) {
     super.start(director, player, hazards);
-    this.riseHeight = this.difficulty === 'HARD' ? 100 : (this.difficulty === 'EASY' ? 45 : 70);
-    if (this.taskbarEl) {
-      this.taskbarEl.style.display = 'block';
-      this.taskbarEl.style.height = `${this.riseHeight}px`;
+    this.currentRise = 0;
+    this.maxRise = this.difficulty === 'HARD' ? 220 : (this.difficulty === 'EASY' ? 140 : 185);
+    this.glitchParticles = [];
+    this.submergedDamageTimer = 0;
+
+    // Digital matrix data particles rising through the taskbar stack
+    for (let i = 0; i < 28; i++) {
+      this.glitchParticles.push({
+        x: 10 + Math.random() * 620,
+        y: 440 + Math.random() * 60,
+        speed: 50 + Math.random() * 70,
+        char: ['0x00', '0xFF', 'ERR', '01', 'SYS', 'STACK', '404', 'DLL', 'RAM'][Math.floor(Math.random() * 9)],
+        size: 8 + Math.floor(Math.random() * 4),
+        alpha: 0.3 + Math.random() * 0.5
+      });
     }
 
-    player.customBounds = {
-      xMin: 0,
-      xMax: 640,
-      yMin: 0,
-      yMax: 440 - this.riseHeight
-    };
+    if (typeof audio !== 'undefined') audio.playLaserWarning();
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    // Smooth rising taskbar curve:
+    // 0.0s - 3.0s: Rise up to maxRise
+    // 3.0s - 4.8s: Hold peak overflow
+    // 4.8s - 6.5s: Drain back down to 0
+    if (this.timer <= 3.0) {
+      const progress = this.timer / 3.0;
+      this.currentRise = this.maxRise * (1 - Math.pow(1 - progress, 3));
+    } else if (this.timer <= 4.8) {
+      this.currentRise = this.maxRise;
+    } else {
+      const drainProgress = (this.timer - 4.8) / 1.7;
+      this.currentRise = this.maxRise * Math.max(0, 1 - drainProgress);
+    }
+
+    const overflowTopY = 440 - this.currentRise;
+
+    // Player submerged inside taskbar stack
+    if (player && player.isAlive) {
+      if (player.y + player.radius > overflowTopY + 4) {
+        // Upward mechanical pushback
+        player.y -= 130 * dt;
+
+        this.submergedDamageTimer += dt;
+        if (this.submergedDamageTimer >= 0.45 && !player.isInvulnerable) {
+          this.submergedDamageTimer = 0;
+          player.takeDamage(12);
+          if (typeof audio !== 'undefined') audio.playHurt();
+          if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+        }
+      }
+    }
+
+    // Update digital data particles
+    for (const p of this.glitchParticles) {
+      p.y -= p.speed * dt;
+      if (p.y < overflowTopY - 10) {
+        p.y = 440 + Math.random() * 30;
+        p.x = 10 + Math.random() * 620;
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted || this.currentRise <= 0) return;
+    ctx.save();
+
+    const overflowTopY = 440 - this.currentRise;
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+    const barHeight = 28;
+    const totalBars = Math.ceil(this.currentRise / barHeight) + 1;
+
+    // 1. Stacked Cascading Windows 98 Taskbars
+    for (let i = 0; i < totalBars; i++) {
+      const barY = 440 - ((i + 1) * barHeight);
+      if (barY + barHeight < overflowTopY) continue;
+
+      const drawTop = Math.max(barY, overflowTopY);
+      const drawHeight = Math.min(barHeight, (barY + barHeight) - drawTop);
+      if (drawHeight <= 0) continue;
+
+      // Win98 Taskbar Base Gray Fill
+      ctx.fillStyle = '#c0c0c0';
+      ctx.fillRect(0, drawTop, 640, drawHeight);
+
+      // 3D Bevel: Top Light Edge
+      if (barY >= overflowTopY) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, barY, 640, 1.5);
+      }
+
+      // 3D Bevel: Bottom Dark Edge
+      ctx.fillStyle = '#404040';
+      ctx.fillRect(0, barY + barHeight - 1.5, 640, 1.5);
+
+      // Start Button (Windows 98 Style)
+      const btnW = 54;
+      const btnH = 20;
+      const btnY = barY + 4;
+      if (btnY >= overflowTopY && btnY + btnH <= barY + barHeight) {
+        // Button 3D outset
+        ctx.fillStyle = '#c0c0c0';
+        ctx.fillRect(4, btnY, btnW, btnH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(4, btnY, btnW, 1.5);
+        ctx.fillRect(4, btnY, 1.5, btnH);
+        ctx.fillStyle = '#404040';
+        ctx.fillRect(4, btnY + btnH - 1.5, btnW, 1.5);
+        ctx.fillRect(4 + btnW - 1.5, btnY, 1.5, btnH);
+
+        // Windows Logo / Start text
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 10px "Segoe UI", Tahoma, monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isKo ? '🪟 시작' : '🪟 Start', 10, btnY + btnH / 2 + 1);
+      }
+
+      // Corrupted Application Tabs in Taskbar
+      const appTitles = isKo
+        ? ['⚠️ 시스템오류.exe', '💀 DANGER.DLL', '💥 STACK_OVERFLOW', '🛑 FATAL_0x99', '💾 BUFFER_ERROR']
+        : ['⚠️ SYSTEM_ERR.EXE', '💀 DANGER.DLL', '💥 STACK_OVERFLOW', '🛑 FATAL_0x99', '💾 BUFFER_ERROR'];
+      const appTabW = 100;
+      const appTabX = 64 + ((i * 35) % 120);
+
+      if (btnY >= overflowTopY && btnY + btnH <= barY + barHeight) {
+        // Sunken pressed button
+        ctx.fillStyle = '#b0b0b0';
+        ctx.fillRect(appTabX, btnY, appTabW, btnH);
+        ctx.fillStyle = '#404040';
+        ctx.fillRect(appTabX, btnY, appTabW, 1);
+        ctx.fillRect(appTabX, btnY, 1, btnH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(appTabX, btnY + btnH - 1, appTabW, 1);
+        ctx.fillRect(appTabX + appTabW - 1, btnY, 1, btnH);
+
+        ctx.fillStyle = '#111111';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(appTitles[(i + 1) % appTitles.length], appTabX + 4, btnY + btnH / 2 + 1);
+      }
+
+      // System Tray Area (Clock & Error Icons)
+      const trayW = 75;
+      const trayX = 640 - trayW - 4;
+      if (btnY >= overflowTopY && btnY + btnH <= barY + barHeight) {
+        // Sunken 3D Tray Inset
+        ctx.fillStyle = '#b5b5b5';
+        ctx.fillRect(trayX, btnY, trayW, btnH);
+        ctx.fillStyle = '#404040';
+        ctx.fillRect(trayX, btnY, trayW, 1);
+        ctx.fillRect(trayX, btnY, 1, btnH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(trayX, btnY + btnH - 1, trayW, 1);
+        ctx.fillRect(trayX + trayW - 1, btnY, 1, btnH);
+
+        // Blinking Tray Error Icon & Digital Clock
+        const flashIcon = (Math.floor(this.timer * 6 + i) % 2 === 0) ? '⚠️' : '⚡';
+        ctx.fillStyle = '#000000';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(flashIcon, trayX + 4, btnY + btnH / 2 + 1);
+
+        const clockText = `12:${(30 + i * 7) % 60 < 10 ? '0' : ''}${(30 + i * 7) % 60}`;
+        ctx.fillText(clockText, trayX + 24, btnY + btnH / 2 + 1);
+      }
+    }
+
+    // 2. Digital Glitch Scanlines & Matrix Particle Streams
+    for (const p of this.glitchParticles) {
+      if (p.y >= overflowTopY && p.y <= 440) {
+        ctx.fillStyle = `rgba(0, 80, 180, ${p.alpha * 0.75})`;
+        ctx.font = `bold ${p.size}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(p.char, p.x, p.y);
+      }
+    }
+
+    // 3. Top Hazard Boundary Barrier (Retro Hazard Stripe Tape & Neon Glitch Line)
+    const stripeW = 16;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, overflowTopY - 4, 640, 8);
+    ctx.clip();
+
+    for (let sx = -32; sx < 640 + 32; sx += stripeW) {
+      const offset = (this.timer * 25) % stripeW;
+      ctx.fillStyle = (Math.floor((sx + offset) / stripeW) % 2 === 0) ? '#ffcc00' : '#111111';
+      ctx.beginPath();
+      ctx.moveTo(sx + offset, overflowTopY + 4);
+      ctx.lineTo(sx + offset + 8, overflowTopY - 4);
+      ctx.lineTo(sx + offset + stripeW + 8, overflowTopY - 4);
+      ctx.lineTo(sx + offset + stripeW, overflowTopY + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Neon Glitch Laser Border Line
+    ctx.strokeStyle = (Math.floor(this.timer * 15) % 2 === 0) ? '#ff0033' : '#00ffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, overflowTopY);
+    ctx.lineTo(640, overflowTopY);
+    ctx.stroke();
+
+    // 4. Concise In-Game Warning Tag
+    const warningAlpha = (Math.floor(this.timer * 10) % 2 === 0) ? 0.95 : 0.45;
+    ctx.fillStyle = `rgba(255, 230, 0, ${warningAlpha})`;
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      isKo ? '▲ [ 작업표시줄 범람: 상단 대피 ] ▲' : '▲ [ TASKBAR OVERFLOW: EVACUATE UPWARD ] ▲',
+      320,
+      Math.max(18, overflowTopY - 10)
+    );
+
+    ctx.restore();
   }
 
   onEnd() {
-    if (this.taskbarEl) this.taskbarEl.style.display = 'none';
-    if (this.player) this.player.customBounds = null;
+    this.currentRise = 0;
+    this.glitchParticles = [];
   }
 }
 
 // -------------------------------------------------------------
 // EVENT 12: SCREEN TEARING (VISION)
-// Horizontal display splitting into desynced staggered strips
+// Horizontal display splitting into gentle, authentic desynced strips
 // -------------------------------------------------------------
 class ScreenTearingEvent extends BaseInterferenceEvent {
   constructor() {
@@ -760,40 +944,37 @@ class ScreenTearingEvent extends BaseInterferenceEvent {
       duration: 5.5,
       instruction: 'DISPLAY DESYNC: HORIZONTAL TEARING DETECTED'
     });
-    this.slicesCount = 5;
+    this.slicesCount = 3;
     this.sliceOffsets = [];
     this.sliceBounds = [];
-    this.glitchTimer = 0;
-    this.glitchOffset = 0;
+    this.tearLineY = 120;
+    this.tearSpeed = 50;
     this.offscreenCanvas = null;
     this.offscreenCtx = null;
   }
 
   getBulletModifier() {
     return {
-      speedMultiplier: 0.85,
-      densityMultiplier: 0.85
+      speedMultiplier: 0.75,
+      densityMultiplier: 0.70
     };
   }
 
   start(director, player, hazards) {
     super.start(director, player, hazards);
-    this.slicesCount = this.difficulty === 'HARD' ? 6 : (this.difficulty === 'EASY' ? 3 : 5);
+    // 2-3 clean horizontal bands for authentic V-Sync tearing without violent shaking
+    this.slicesCount = this.difficulty === 'HARD' ? 3 : (this.difficulty === 'EASY' ? 2 : 3);
+    this.tearLineY = 80;
+    this.tearSpeed = this.difficulty === 'HARD' ? 70 : 50;
     
-    // Dynamic organic slice heights across the 440px canvas
+    // Stable, fair slice heights across the 440px canvas
     this.sliceBounds = [];
     const totalH = 440;
     let currentY = 0;
-    const baseH = totalH / this.slicesCount;
+    const baseH = Math.floor(totalH / this.slicesCount);
     
     for (let i = 0; i < this.slicesCount; i++) {
-      let h;
-      if (i === this.slicesCount - 1) {
-        h = totalH - currentY;
-      } else {
-        const variance = (Math.random() - 0.5) * (baseH * 0.4);
-        h = Math.round(Math.max(30, Math.min(baseH * 1.5, baseH + variance)));
-      }
+      const h = (i === this.slicesCount - 1) ? (totalH - currentY) : baseH;
       this.sliceBounds.push({ y: currentY, h: h });
       currentY += h;
     }
@@ -812,22 +993,24 @@ class ScreenTearingEvent extends BaseInterferenceEvent {
     super.update(dt, player, hazards);
     if (this.isCompleted) return;
 
-    const maxShift = this.difficulty === 'HARD' ? 32 : (this.difficulty === 'EASY' ? 14 : 22);
+    // Moderate, readable displacement (8px ~ 15px max) instead of jarring extreme shifts
+    const maxShift = this.difficulty === 'HARD' ? 15 : (this.difficulty === 'EASY' ? 8 : 12);
 
-    this.glitchTimer += dt;
-    if (this.glitchTimer > 0.45) {
-      this.glitchTimer = 0;
-      this.glitchOffset = (Math.random() - 0.5) * maxShift * 1.6;
-    } else {
-      this.glitchOffset *= 0.85;
-    }
+    // Slowly roll a tearing seam downward for authentic retro V-Sync drift
+    this.tearLineY = (this.tearLineY + this.tearSpeed * dt) % 440;
 
+    // Slow, gentle sinusoidal wave (0.8 ~ 1.4 Hz) so player easily tracks bullets and hitbox
     for (let i = 0; i < this.slicesCount; i++) {
-      const freq = 3.2 + i * 1.8;
-      const phase = i * 2.3;
-      const isGlitchedSlice = (i % 2 === 0);
-      const extraGlitch = isGlitchedSlice ? this.glitchOffset : -this.glitchOffset * 0.5;
-      this.sliceOffsets[i] = Math.sin(this.timer * freq + phase) * maxShift + extraGlitch;
+      const slowFreq = 1.0 + i * 0.4;
+      const phase = i * 1.5;
+      const baseOffset = Math.sin(this.timer * slowFreq * Math.PI + phase) * maxShift;
+      
+      // Dynamic shift when the rolling tear seam passes this slice
+      const sliceMid = this.sliceBounds[i].y + this.sliceBounds[i].h / 2;
+      const distToSeam = Math.abs(this.tearLineY - sliceMid);
+      const seamKick = distToSeam < 60 ? (1 - distToSeam / 60) * (i % 2 === 0 ? maxShift * 0.5 : -maxShift * 0.5) : 0;
+
+      this.sliceOffsets[i] = baseOffset + seamKick;
     }
   }
 
@@ -851,7 +1034,7 @@ class ScreenTearingEvent extends BaseInterferenceEvent {
       ctx.drawImage(
         this.offscreenCanvas,
         0, slice.y, 640, slice.h,          // source rect
-        offset, slice.y, 640, slice.h       // dest rect shifted horizontally!
+        offset, slice.y, 640, slice.h       // dest rect shifted horizontally
       );
 
       // If shifted, fill the empty margin with retro dark background
@@ -863,18 +1046,18 @@ class ScreenTearingEvent extends BaseInterferenceEvent {
         ctx.fillRect(640 + offset, slice.y, -offset, slice.h);
       }
 
-      // RGB Desync Glow Line at Tear Boundary
-      if (i > 0 && Math.abs(offset) > 3) {
+      // Clean, stylish RGB Desync line at tear boundary
+      if (i > 0 && Math.abs(offset) >= 2) {
         ctx.save();
-        ctx.strokeStyle = offset > 0 ? 'rgba(0, 255, 255, 0.85)' : 'rgba(255, 20, 80, 0.85)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = offset > 0 ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 40, 90, 0.7)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(0, slice.y);
         ctx.lineTo(640, slice.y);
         ctx.stroke();
 
-        // Subtle chromatic tint on torn strip
-        ctx.fillStyle = offset > 0 ? 'rgba(0, 255, 255, 0.06)' : 'rgba(255, 0, 80, 0.06)';
+        // Very subtle atmospheric chromatic glow on torn strip
+        ctx.fillStyle = offset > 0 ? 'rgba(0, 255, 255, 0.03)' : 'rgba(255, 0, 80, 0.03)';
         ctx.fillRect(0, slice.y, 640, slice.h);
         ctx.restore();
       }
@@ -1079,174 +1262,7 @@ class MouseTrailEvent extends BaseInterferenceEvent {
   }
 }
 
-// -------------------------------------------------------------
-// EVENT 15: WINDOW GHOST (WINDOW / VISION)
-// Translucent duplicate ghost frames offset behind the main game window
-// -------------------------------------------------------------
-class WindowGhostEvent extends BaseInterferenceEvent {
-  constructor() {
-    super({
-      id: 'window_ghost',
-      name: 'Window Ghost',
-      category: 'WINDOW',
-      warningType: 'DUPLICATE WINDOW DETECTED',
-      duration: 5.0,
-      instruction: 'DUPLICATE WINDOW DETECTED!'
-    });
-    this.windowEl = document.getElementById('main-game-window');
-    this.clones = [];
-  }
 
-  getBulletModifier() {
-    return {
-      speedMultiplier: 0.85,
-      densityMultiplier: 0.85
-    };
-  }
-
-  start(director, player, hazards) {
-    super.start(director, player, hazards);
-    this.removeClones();
-
-    const cloneCount = this.difficulty === 'HARD' ? 2 : 1;
-    const desktop = document.getElementById('desktop');
-    if (!desktop || !this.windowEl) return;
-
-    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
-    for (let i = 0; i < cloneCount; i++) {
-      const clone = document.createElement('div');
-      clone.className = 'win98-window win98-box-outset window-ghost-clone';
-      const title = isKo ? `👻 유령_창_${i + 1}.EXE` : `👻 GHOST_FRAME_${i + 1}.EXE`;
-      const body = isKo ? `[ 복제된 뷰포트 감지됨 ]` : `[ GHOST VIEWPORT DETECTED ]`;
-      clone.innerHTML = `
-        <div class="win98-titlebar" style="background: linear-gradient(90deg, #505080, #7070b0);">
-          <div class="titlebar-left"><span>${title}</span></div>
-        </div>
-        <div style="width: 648px; height: 476px; background-color: #000000; display: flex; align-items: center; justify-content: center; color: #00ff66; font-family: monospace; font-size: 11px;">
-          ${body}
-        </div>
-      `;
-      desktop.appendChild(clone);
-      this.clones.push(clone);
-    }
-  }
-
-  update(dt, player, hazards) {
-    super.update(dt, player, hazards);
-    if (this.isCompleted) return;
-
-    const baseOffset = this.difficulty === 'HARD' ? 45 : (this.difficulty === 'EASY' ? 22 : 32);
-
-    for (let i = 0; i < this.clones.length; i++) {
-      const clone = this.clones[i];
-      const dir = (i === 0) ? 1 : -1;
-      const offsetX = Math.sin(this.timer * 2.5 + i) * baseOffset * dir;
-      const offsetY = Math.cos(this.timer * 2.0 + i) * (baseOffset * 0.7) * dir;
-
-      clone.style.left = '50%';
-      clone.style.top = '50%';
-      clone.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% - 14px + ${offsetY}px))`;
-    }
-  }
-
-  removeClones() {
-    for (const c of this.clones) {
-      if (c && c.parentNode) c.parentNode.removeChild(c);
-    }
-    this.clones = [];
-  }
-
-  onEnd() {
-    this.removeClones();
-  }
-}
-
-// -------------------------------------------------------------
-// EVENT 16: SCROLLBAR MALFUNCTION (SPACE / UI)
-// Fake retro scrollbars expand inward and constrict playable space
-// -------------------------------------------------------------
-class ScrollbarMalfunctionEvent extends BaseInterferenceEvent {
-  constructor() {
-    super({
-      id: 'scrollbar_malfunction',
-      name: 'Scrollbar Malfunction',
-      category: 'SPACE',
-      warningType: 'WINDOW SIZE ERROR',
-      duration: 5.5,
-      instruction: 'SCROLLBARS SQUEEZING PLAYABLE SPACE!'
-    });
-    this.sbV = document.getElementById('fake-scrollbar-v');
-    this.sbH = document.getElementById('fake-scrollbar-h');
-    this.vWidth = 38;
-    this.hHeight = 32;
-  }
-
-  getBulletModifier() {
-    return {
-      densityMultiplier: 0.80,
-      spawnBounds: {
-        minX: 0,
-        maxX: 640 - this.vWidth,
-        minY: 0,
-        maxY: 440 - this.hHeight
-      }
-    };
-  }
-
-  start(director, player, hazards) {
-    super.start(director, player, hazards);
-
-    if (this.difficulty === 'EASY') {
-      this.vWidth = 32;
-      this.hHeight = 0;
-    } else if (this.difficulty === 'HARD') {
-      this.vWidth = 60;
-      this.hHeight = 50;
-    } else {
-      this.vWidth = 40;
-      this.hHeight = 34;
-    }
-
-    if (this.sbV) {
-      this.sbV.style.display = 'flex';
-      this.sbV.style.width = `${this.vWidth}px`;
-    }
-    if (this.sbH && this.hHeight > 0) {
-      this.sbH.style.display = 'flex';
-      this.sbH.style.height = `${this.hHeight}px`;
-      this.sbH.style.right = `${this.vWidth}px`;
-    }
-
-    player.customBounds = {
-      xMin: 0,
-      xMax: 640 - this.vWidth,
-      yMin: 0,
-      yMax: 440 - this.hHeight
-    };
-  }
-
-  update(dt, player, hazards) {
-    super.update(dt, player, hazards);
-    if (this.isCompleted) return;
-
-    const thumbV = document.getElementById('sb-thumb-v');
-    const thumbH = document.getElementById('sb-thumb-h');
-    if (thumbV) {
-      const topPct = 20 + Math.sin(this.timer * 3) * 20;
-      thumbV.style.top = `${topPct}%`;
-    }
-    if (thumbH) {
-      const leftPct = 20 + Math.cos(this.timer * 2.5) * 20;
-      thumbH.style.left = `${leftPct}%`;
-    }
-  }
-
-  onEnd() {
-    if (this.sbV) this.sbV.style.display = 'none';
-    if (this.sbH) this.sbH.style.display = 'none';
-    if (this.player) this.player.customBounds = null;
-  }
-}
 
 // -------------------------------------------------------------
 // EVENT 17: ZIP BOMB (ATTACK / AREA BURST)
@@ -1399,10 +1415,11 @@ class ZipBombEvent extends BaseInterferenceEvent {
         ctx.fillStyle = '#ffff00';
         ctx.fillRect(-4, 6, 8, 5);
 
+        const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(zip.label, 0, 24);
+        ctx.fillText(isKo ? '압축파일.zip' : zip.label, 0, 24);
         
         ctx.fillStyle = '#ff4444';
         ctx.font = 'bold 10px monospace';
@@ -1449,6 +1466,10 @@ class ZipBombEvent extends BaseInterferenceEvent {
 // EVENT 18: ERROR LASER (ATTACK / LINE STRIKE)
 // Weaponized error turret dialog charges and fires a high-intensity laser
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// EVENT 18: ERROR LASER (ATTACK / LINE STRIKE)
+// Weaponized error turret dialogs charge and fire multi-beam crossfire barrages
+// -------------------------------------------------------------
 class ErrorLaserEvent extends BaseInterferenceEvent {
   constructor() {
     super({
@@ -1457,14 +1478,14 @@ class ErrorLaserEvent extends BaseInterferenceEvent {
       category: 'ATTACK',
       warningType: 'CRITICAL ERROR',
       duration: 6.0,
-      instruction: 'ERROR TURRET ACTIVATED! DODGE THE BEAM'
+      instruction: 'ERROR TURRETS DETECTED! DODGE THE CROSSFIRE'
     });
     this.strikes = [];
   }
 
   getBulletModifier() {
     return {
-      densityMultiplier: 0.80,
+      densityMultiplier: 0.70,
       suppressLasers: true
     };
   }
@@ -1476,32 +1497,101 @@ class ErrorLaserEvent extends BaseInterferenceEvent {
     const isEasy = (this.difficulty === 'EASY');
     const isHard = (this.difficulty === 'HARD');
 
-    const strike1 = {
-      x: 0,
-      y: 120 + Math.random() * 200,
-      angle: 0,
-      startTime: 0.4,
-      aimDuration: isHard ? 0.65 : 0.85,
-      fireDuration: 0.65,
-      beamWidth: isHard ? 34 : (isEasy ? 24 : 28),
-      fired: false,
-      warned: false
-    };
-    this.strikes.push(strike1);
+    if (isEasy) {
+      // 2 Sequential Strikes
+      this.strikes.push({
+        x: 0, y: 120 + Math.random() * 200, angle: 0,
+        startTime: 0.5, aimDuration: 0.85, fireDuration: 0.65, beamWidth: 26,
+        fired: false, warned: false, label: 'ERROR_1.DLL'
+      });
+      this.strikes.push({
+        x: 140 + Math.random() * 360, y: 0, angle: Math.PI / 2,
+        startTime: 3.0, aimDuration: 0.85, fireDuration: 0.65, beamWidth: 26,
+        fired: false, warned: false, label: 'ERROR_2.DLL'
+      });
+    } else if (!isHard) {
+      // NORMAL: 2 Crossfire Salvos (4 Turrets total)
+      // Salvo 1: Crossfire at 0.4s
+      const crossY1 = 120 + Math.random() * 200;
+      const crossX1 = 160 + Math.random() * 320;
+      this.strikes.push({
+        x: 0, y: crossY1, angle: 0,
+        startTime: 0.4, aimDuration: 0.80, fireDuration: 0.65, beamWidth: 28,
+        fired: false, warned: false, label: 'ERROR_01.EXE'
+      });
+      this.strikes.push({
+        x: crossX1, y: 0, angle: Math.PI / 2,
+        startTime: 0.4, aimDuration: 0.80, fireDuration: 0.65, beamWidth: 28,
+        fired: false, warned: false, label: 'ERROR_02.EXE'
+      });
 
-    if (!isEasy) {
-      const strike2 = {
-        x: 160 + Math.random() * 320,
-        y: 0,
-        angle: Math.PI / 2,
-        startTime: 2.4,
-        aimDuration: isHard ? 0.65 : 0.85,
-        fireDuration: 0.65,
-        beamWidth: isHard ? 34 : 28,
-        fired: false,
-        warned: false
-      };
-      this.strikes.push(strike2);
+      // Salvo 2: Dual Crossfire at 2.9s
+      const crossY2 = (crossY1 > 220) ? crossY1 - 110 : crossY1 + 110;
+      const crossX2 = (crossX1 > 320) ? crossX1 - 150 : crossX1 + 150;
+      this.strikes.push({
+        x: 0, y: crossY2, angle: 0,
+        startTime: 2.9, aimDuration: 0.80, fireDuration: 0.65, beamWidth: 28,
+        fired: false, warned: false, label: 'FATAL_03.DLL'
+      });
+      this.strikes.push({
+        x: crossX2, y: 0, angle: Math.PI / 2,
+        startTime: 2.9, aimDuration: 0.80, fireDuration: 0.65, beamWidth: 28,
+        fired: false, warned: false, label: 'FATAL_04.DLL'
+      });
+    } else {
+      // HARD: 4 Rapid Intense Salvos with Multi-Turret Barrages! (9 Turrets total)
+      // Salvo 1 (0.3s): Dual Crossfire
+      this.strikes.push({
+        x: 0, y: 140, angle: 0,
+        startTime: 0.3, aimDuration: 0.65, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'SYS_01.EXE'
+      });
+      this.strikes.push({
+        x: 460, y: 0, angle: Math.PI / 2,
+        startTime: 0.3, aimDuration: 0.65, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'SYS_02.EXE'
+      });
+
+      // Salvo 2 (1.6s): Dual Vertical Grid Squeeze
+      this.strikes.push({
+        x: 180, y: 0, angle: Math.PI / 2,
+        startTime: 1.6, aimDuration: 0.60, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'PINCH_A.DLL'
+      });
+      this.strikes.push({
+        x: 0, y: 300, angle: 0,
+        startTime: 1.6, aimDuration: 0.60, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'PINCH_B.DLL'
+      });
+
+      // Salvo 3 (2.9s): Triple Barrage! (2 Vertical + 1 Horizontal)
+      this.strikes.push({
+        x: 0, y: 220, angle: 0,
+        startTime: 2.9, aimDuration: 0.60, fireDuration: 0.55, beamWidth: 32,
+        fired: false, warned: false, label: 'TURRET_C.EXE'
+      });
+      this.strikes.push({
+        x: 130, y: 0, angle: Math.PI / 2,
+        startTime: 2.9, aimDuration: 0.60, fireDuration: 0.55, beamWidth: 32,
+        fired: false, warned: false, label: 'TURRET_D.EXE'
+      });
+      this.strikes.push({
+        x: 510, y: 0, angle: Math.PI / 2,
+        startTime: 2.9, aimDuration: 0.60, fireDuration: 0.55, beamWidth: 32,
+        fired: false, warned: false, label: 'TURRET_E.EXE'
+      });
+
+      // Salvo 4 (4.3s): Final Rapid Crossing Snap
+      this.strikes.push({
+        x: 0, y: 100 + Math.random() * 240, angle: 0,
+        startTime: 4.3, aimDuration: 0.55, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'FINAL_X.DLL'
+      });
+      this.strikes.push({
+        x: 160 + Math.random() * 320, y: 0, angle: Math.PI / 2,
+        startTime: 4.3, aimDuration: 0.55, fireDuration: 0.55, beamWidth: 30,
+        fired: false, warned: false, label: 'FINAL_Y.DLL'
+      });
     }
   }
 
@@ -1573,26 +1663,43 @@ class ErrorLaserEvent extends BaseInterferenceEvent {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = '#c0c0c0';
-        ctx.fillRect(strike.x - 16, strike.y - 12, 32, 24);
-        ctx.strokeStyle = '#ffffff';
-        ctx.strokeRect(strike.x - 16, strike.y - 12, 32, 24);
+        // Win98 Error Turret Dialogue Box at Border
+        const tw = 68;
+        const th = 22;
+        const tx = (strike.angle === 0) ? strike.x + tw / 2 : strike.x;
+        const ty = (strike.angle === 0) ? strike.y : strike.y + th / 2;
+
+        ctx.fillStyle = '#d4d0c8';
+        ctx.fillRect(tx - tw / 2, ty - th / 2, tw, th);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tx - tw / 2, ty - th / 2, tw, th);
+
+        // Red X Warning Icon
         ctx.fillStyle = '#ff0000';
-        ctx.font = 'bold 12px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('❌', strike.x, strike.y + 4);
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('❌', tx - tw / 2 + 3, ty + 3);
+
+        // Label
+        const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 8px monospace';
+        ctx.fillText(isKo ? '오류.EXE' : (strike.label || 'ERROR'), tx - tw / 2 + 18, ty + 3);
 
         ctx.restore();
       } else if (strike.state === 'FIRING') {
         ctx.save();
 
-        ctx.strokeStyle = 'rgba(255, 0, 60, 0.4)';
-        ctx.lineWidth = strike.beamWidth + 16;
+        // Outer glow
+        ctx.strokeStyle = 'rgba(255, 0, 80, 0.45)';
+        ctx.lineWidth = strike.beamWidth + 18;
         ctx.beginPath();
         ctx.moveTo(strike.x, strike.y);
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
+        // Main electric beam
         ctx.strokeStyle = '#ff0055';
         ctx.lineWidth = strike.beamWidth;
         ctx.beginPath();
@@ -1600,16 +1707,18 @@ class ErrorLaserEvent extends BaseInterferenceEvent {
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
+        // Inner electric core
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = Math.max(4, strike.beamWidth / 3);
+        ctx.lineWidth = Math.max(5, strike.beamWidth / 3);
         ctx.beginPath();
         ctx.moveTo(strike.x, strike.y);
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
+        // Turret firing flare
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(strike.x, strike.y, 16 + Math.sin(this.timer * 30) * 4, 0, Math.PI * 2);
+        ctx.arc(strike.x, strike.y, 18 + Math.sin(this.timer * 30) * 4, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
@@ -1623,8 +1732,8 @@ class ErrorLaserEvent extends BaseInterferenceEvent {
 }
 
 // -------------------------------------------------------------
-// EVENT 19: ANTIVIRUS SCAN (ATTACK / SWEEP)
-// Sweeping radar scan field searches for the player with threat zone
+// EVENT 19: ANTIVIRUS SCAN (ATTACK / MOTION DETECTOR SWEEP)
+// Sweeping radar scanline searches for movement: FREEZE INSIDE THE BEAM!
 // -------------------------------------------------------------
 class AntivirusScanEvent extends BaseInterferenceEvent {
   constructor() {
@@ -1634,27 +1743,35 @@ class AntivirusScanEvent extends BaseInterferenceEvent {
       category: 'ATTACK',
       warningType: 'SCAN IN PROGRESS',
       duration: 6.0,
-      instruction: 'THREAT DETECTED: PLAYER! AVOID SCAN FIELD'
+      instruction: 'ANTIVIRUS SCAN: STOP MOVING INSIDE THE BEAM!'
     });
     this.scanX = -100;
     this.scanDirection = 1;
     this.passCount = 0;
-    this.sweepSpeed = 160;
+    this.sweepSpeed = 150;
+    this.beamWidth = 52;
+    this.isPlayerDetected = false;
+    this.detectedTimer = 0;
+    this.hitCooldown = 0;
   }
 
   getBulletModifier() {
     return {
-      densityMultiplier: 0.75,
-      speedMultiplier: 0.85
+      densityMultiplier: 0.70,
+      speedMultiplier: 0.80
     };
   }
 
   start(director, player, hazards) {
     super.start(director, player, hazards);
-    this.scanX = -40;
+    this.scanX = -50;
     this.scanDirection = 1;
     this.passCount = 0;
-    this.sweepSpeed = (this.difficulty === 'HARD') ? 220 : ((this.difficulty === 'NORMAL') ? 170 : 130);
+    this.sweepSpeed = (this.difficulty === 'HARD') ? 190 : ((this.difficulty === 'NORMAL') ? 150 : 120);
+    this.beamWidth = (this.difficulty === 'HARD') ? 60 : 50;
+    this.isPlayerDetected = false;
+    this.detectedTimer = 0;
+    this.hitCooldown = 0;
     if (typeof audio !== 'undefined') audio.playScanSweep();
   }
 
@@ -1663,14 +1780,18 @@ class AntivirusScanEvent extends BaseInterferenceEvent {
     if (this.isCompleted) return;
 
     this.scanX += this.scanDirection * this.sweepSpeed * dt;
+    if (this.hitCooldown > 0) this.hitCooldown -= dt;
+    if (this.detectedTimer > 0) this.detectedTimer -= dt;
+    else this.isPlayerDetected = false;
 
-    if (this.scanDirection === 1 && this.scanX > 640 + 40) {
+    // Bounce sweep
+    if (this.scanDirection === 1 && this.scanX > 640 + 50) {
       if (this.difficulty !== 'EASY' && this.passCount === 0) {
         this.scanDirection = -1;
         this.passCount++;
         if (typeof audio !== 'undefined') audio.playScanSweep();
       }
-    } else if (this.scanDirection === -1 && this.scanX < -40) {
+    } else if (this.scanDirection === -1 && this.scanX < -50) {
       if (this.difficulty === 'HARD' && this.passCount === 1) {
         this.scanDirection = 1;
         this.passCount++;
@@ -1679,13 +1800,27 @@ class AntivirusScanEvent extends BaseInterferenceEvent {
     }
 
     const playerX = player ? player.x : 320;
-    const beamWidth = 32;
+    const playerY = player ? player.y : 220;
+    const pRadius = (player && player.radius) ? player.radius : 8;
 
-    if (player && player.isAlive && !player.isInvulnerable) {
-      if (Math.abs(playerX - this.scanX) < beamWidth / 2 + player.radius) {
-        player.takeDamage(15);
-        if (typeof audio !== 'undefined') audio.playHurt();
-        if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+    // Check if player is currently INSIDE the scan beam
+    const isInsideBeam = Math.abs(playerX - this.scanX) < (this.beamWidth / 2 + pRadius);
+
+    if (isInsideBeam && player && player.hp > 0) {
+      // Check if player is MOVING (player.isMoving or movement keys pressed)
+      const isMoving = player.isMoving || (player.keys && (player.keys.up || player.keys.down || player.keys.left || player.keys.right));
+
+      if (isMoving) {
+        // TRIGGER VIRUS DETECTION!
+        this.isPlayerDetected = true;
+        this.detectedTimer = 0.55;
+
+        if (this.hitCooldown <= 0 && !player.invulnerable) {
+          this.hitCooldown = 0.35;
+          player.takeDamage(15);
+          if (typeof audio !== 'undefined') audio.playHurt();
+          if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+        }
       }
     }
   }
@@ -1694,23 +1829,33 @@ class AntivirusScanEvent extends BaseInterferenceEvent {
     if (this.isCompleted) return;
 
     ctx.save();
-    const beamWidth = 32;
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
 
+    // 1. Scan Area Light (Holographic radar gradient)
     const trailDir = this.scanDirection === 1 ? -1 : 1;
-    const grad = ctx.createLinearGradient(this.scanX, 0, this.scanX + trailDir * 120, 0);
-    grad.addColorStop(0, 'rgba(255, 0, 50, 0.28)');
-    grad.addColorStop(1, 'rgba(255, 0, 50, 0.0)');
+    const grad = ctx.createLinearGradient(this.scanX, 0, this.scanX + trailDir * 140, 0);
+
+    if (this.isPlayerDetected) {
+      grad.addColorStop(0, 'rgba(255, 0, 50, 0.45)');
+      grad.addColorStop(1, 'rgba(255, 0, 50, 0.0)');
+    } else {
+      grad.addColorStop(0, 'rgba(0, 255, 120, 0.25)');
+      grad.addColorStop(1, 'rgba(0, 255, 120, 0.0)');
+    }
 
     ctx.fillStyle = grad;
-    ctx.fillRect(Math.min(this.scanX, this.scanX + trailDir * 120), 0, 120, 440);
+    ctx.fillRect(Math.min(this.scanX, this.scanX + trailDir * 140), 0, 140, 440);
 
-    ctx.strokeStyle = '#ff0033';
-    ctx.lineWidth = beamWidth;
+    // 2. Scan Beam Line
+    const beamColor = this.isPlayerDetected ? '#ff0033' : '#00ff66';
+    ctx.strokeStyle = beamColor;
+    ctx.lineWidth = this.beamWidth;
     ctx.beginPath();
     ctx.moveTo(this.scanX, 0);
     ctx.lineTo(this.scanX, 440);
     ctx.stroke();
 
+    // Inner bright laser line
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -1718,18 +1863,78 @@ class AntivirusScanEvent extends BaseInterferenceEvent {
     ctx.lineTo(this.scanX, 440);
     ctx.stroke();
 
-    ctx.fillStyle = '#00ff66';
-    ctx.font = 'bold 11px monospace';
-    ctx.textAlign = 'center';
-    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
-    const label = isKo ? '⚠️ 위협 요소 감지: PLAYER.EXE' : '⚠️ THREAT DETECTED: PLAYER.EXE';
-    ctx.fillText(label, 320, 24);
+    // 3. Scanhead Sensor Node
+    ctx.fillStyle = this.isPlayerDetected ? '#ff0000' : '#00ff88';
+    ctx.beginPath();
+    ctx.arc(this.scanX, 10, 8, 0, Math.PI * 2);
+    ctx.arc(this.scanX, 430, 8, 0, Math.PI * 2);
+    ctx.fill();
 
+    // 4. Player Visual Feedback
+    if (this.player && this.player.isAlive) {
+      const px = this.player.x;
+      const py = this.player.y;
+      const isInside = Math.abs(px - this.scanX) < (this.beamWidth / 2 + this.player.radius);
+
+      if (this.isPlayerDetected) {
+        // Red Flashing Detection Bracket
+        ctx.strokeStyle = (Math.floor(this.timer * 20) % 2 === 0) ? '#ff0000' : '#ffff00';
+        ctx.lineWidth = 2;
+        const boxSize = 28;
+        ctx.strokeRect(px - boxSize / 2, py - boxSize / 2, boxSize, boxSize);
+
+        ctx.fillStyle = '#ff0033';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isKo ? '🚨 위협 감지 (-15 HP)' : '🚨 DETECTED (-15 HP)', px, py - 18);
+      } else if (isInside) {
+        // Green Safe Scan Verification Ring (Standing Still!)
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(px, py, 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#00ff66';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isKo ? '🟢 정지 유지 (안전)' : '🟢 FREEZE (SAFE)', px, py - 18);
+      }
+    }
+
+    // 5. Top Dynamic HUD Alert Banner
+    ctx.save();
+    let bannerBg = this.isPlayerDetected ? '#cc0000' : (Math.abs(this.player ? this.player.x - this.scanX : 999) < this.beamWidth / 2 + 15 ? '#007733' : '#003366');
+    let bannerText = '';
+
+    if (this.isPlayerDetected) {
+      bannerText = isKo ? '🚨 [ 위협 포착: 이동 감지 (-15 HP) ]' : '🚨 [ THREAT DETECTED: MOVED (-15 HP) ]';
+    } else if (this.player && Math.abs(this.player.x - this.scanX) < this.beamWidth / 2 + 15) {
+      bannerText = isKo ? '🟢 [ 백신 검사 중: 이동 정지 (안전) ]' : '🟢 [ SCANNING: FREEZE MOVEMENT (SAFE) ]';
+    } else {
+      bannerText = isKo ? '🛡️ [ 백신 스캔 진행 중: 광선 내 정지 ]' : '🛡️ [ SCAN IN PROGRESS: FREEZE IN BEAM ]';
+    }
+
+    ctx.fillStyle = bannerBg;
+    ctx.fillRect(120, 8, 400, 20);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(120, 8, 400, 20);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(bannerText, 320, 22);
+
+    ctx.restore();
     ctx.restore();
   }
 
   onEnd() {
     this.scanX = -100;
+    this.isPlayerDetected = false;
   }
 }
 
@@ -1986,6 +2191,8 @@ class FirewallEvent extends BaseInterferenceEvent {
   draw(ctx) {
     if (this.isCompleted) return;
 
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
     for (const wall of this.walls) {
       if (this.timer < wall.startTime) continue;
 
@@ -1999,7 +2206,7 @@ class FirewallEvent extends BaseInterferenceEvent {
         ctx.fillStyle = '#00ff66';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('▼ PORT OPEN ▼', wall.gapStart + wall.gapWidth / 2, wall.pos - 6);
+        ctx.fillText(isKo ? '▼ 안전 포트 ▼' : '▼ SAFE PORT ▼', wall.gapStart + wall.gapWidth / 2, wall.pos - 6);
       } else {
         this.drawWallSegment(ctx, wall.pos, 0, wall.thickness, wall.gapStart);
         this.drawWallSegment(ctx, wall.pos, wall.gapStart + wall.gapWidth, wall.thickness, 440 - (wall.gapStart + wall.gapWidth));
@@ -2007,7 +2214,7 @@ class FirewallEvent extends BaseInterferenceEvent {
         ctx.fillStyle = '#00ff66';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('▶ PORT ▶', wall.pos - 6, wall.gapStart + wall.gapWidth / 2);
+        ctx.fillText(isKo ? '▶ 안전 포트 ▶' : '▶ SAFE PORT ▶', wall.pos - 6, wall.gapStart + wall.gapWidth / 2);
       }
 
       ctx.restore();
@@ -2138,6 +2345,1224 @@ class BlueScreenBgEvent extends BaseInterferenceEvent {
   }
 }
 
+// -------------------------------------------------------------
+// EVENT 23: START MENU BARRAGE (ATTACK / MISSILE BARRAGE)
+// Start menu pops open and fires cascade buttons like missiles!
+// -------------------------------------------------------------
+class StartMenuBarrageEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'startMenuBarrage',
+      name: 'Start Menu Barrage',
+      category: 'ATTACK',
+      warningType: 'START MENU MALFUNCTION',
+      duration: 6.5,
+      instruction: 'START MENU POPPING UP! DODGE THE LAUNCHED ITEMS'
+    });
+    this.buttons = [];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.70,
+      speedMultiplier: 0.85
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.buttons = [];
+
+    const isEasy = (this.difficulty === 'EASY');
+    const isHard = (this.difficulty === 'HARD');
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    const labels = isKo ? [
+      { name: '📁 프로그램', icon: '📁' },
+      { name: '📄 내 문서', icon: '📄' },
+      { name: '⚙️ 제어판', icon: '⚙️' },
+      { name: '🔍 파일 찾기', icon: '🔍' },
+      { name: '💻 실행.exe', icon: '💻' },
+      { name: '🔴 시스템 종료', icon: '🔴' }
+    ] : [
+      { name: '📁 Programs', icon: '📁' },
+      { name: '📄 Documents', icon: '📄' },
+      { name: '⚙️ Settings', icon: '⚙️' },
+      { name: '🔍 Find Files', icon: '🔍' },
+      { name: '💻 Run.exe', icon: '💻' },
+      { name: '🔴 Shut Down', icon: '🔴' }
+    ];
+
+    const count = isHard ? 6 : (isEasy ? 3 : 5);
+    const launchInterval = isHard ? 0.60 : 0.75;
+
+    for (let i = 0; i < count; i++) {
+      this.buttons.push({
+        label: labels[i % labels.length].name,
+        origX: 55,
+        origY: 380 - (i * 24),
+        w: 95,
+        h: 22,
+        x: 55,
+        y: 380 - (i * 24),
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        launchTime: 2.0 + (i * launchInterval),
+        state: 'DOCKED',
+        targetX: 320,
+        targetY: 220
+      });
+    }
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    for (const btn of this.buttons) {
+      if (btn.state === 'DONE') continue;
+
+      if (btn.state === 'DOCKED') {
+        if (this.timer >= btn.launchTime - 0.7) {
+          btn.state = 'AIMING';
+          btn.targetX = px;
+          btn.targetY = py;
+          btn.angle = Math.atan2(py - btn.origY, px - btn.origX);
+          if (typeof audio !== 'undefined') audio.playLaserWarning();
+        }
+      } else if (btn.state === 'AIMING') {
+        if (this.timer < btn.launchTime - 0.15) {
+          btn.targetX = px;
+          btn.targetY = py;
+          btn.angle = Math.atan2(py - btn.origY, px - btn.origX);
+        }
+
+        if (this.timer >= btn.launchTime) {
+          btn.state = 'LAUNCHED';
+          const speed = (this.difficulty === 'HARD') ? 340 : 280;
+          btn.vx = Math.cos(btn.angle) * speed;
+          btn.vy = Math.sin(btn.angle) * speed;
+          if (typeof audio !== 'undefined') audio.playKeySlam();
+        }
+      } else if (btn.state === 'LAUNCHED') {
+        btn.x += btn.vx * dt;
+        btn.y += btn.vy * dt;
+
+        if (player && player.isAlive && !player.isInvulnerable) {
+          const halfW = btn.w / 2;
+          const halfH = btn.h / 2;
+          const insideX = (px >= btn.x - halfW - player.radius && px <= btn.x + halfW + player.radius);
+          const insideY = (py >= btn.y - halfH - player.radius && py <= btn.y + halfH + player.radius);
+
+          if (insideX && insideY) {
+            player.takeDamage(15);
+            btn.state = 'DONE';
+            if (typeof audio !== 'undefined') audio.playHurt();
+            if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+          }
+        }
+
+        if (btn.x < -100 || btn.x > 740 || btn.y < -100 || btn.y > 540) {
+          btn.state = 'DONE';
+        }
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    // 0. Pre-activation Telegraph Hazard Zone (timer < 1.0s)
+    if (this.timer < 1.0) {
+      const remain = Math.max(0, 1.0 - this.timer).toFixed(1);
+      ctx.fillStyle = (Math.floor(this.timer * 15) % 2 === 0) ? 'rgba(255, 200, 0, 0.35)' : 'rgba(255, 0, 50, 0.35)';
+      ctx.fillRect(6, 250, 130, 190);
+
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(6, 250, 130, 190);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9.5px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(isKo ? '⚠️ [ 시작 메뉴: 즉시 대피 ]' : '⚠️ [ START POPUP: EVACUATE ]', 71, 330);
+      ctx.fillText(`[ ${remain}s ]`, 71, 350);
+      ctx.restore();
+      return;
+    }
+
+    // 1. Draw Windows 98 Start Menu Container Shell at bottom-left
+    const menuW = 120;
+    const menuElapsed = this.timer - 1.0;
+    const menuH = Math.min(190, menuElapsed * 320);
+    const menuY = 440 - menuH;
+
+    ctx.fillStyle = '#d4d0c8';
+    ctx.fillRect(6, menuY, menuW, menuH);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(6, menuY, menuW, menuH);
+
+    ctx.fillStyle = '#000080';
+    ctx.fillRect(6, menuY, 20, menuH);
+
+    ctx.save();
+    ctx.translate(20, 430);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('Windows 98', 0, 0);
+    ctx.restore();
+
+    for (const btn of this.buttons) {
+      if (btn.state === 'DONE') continue;
+
+      if (btn.state === 'AIMING') {
+        ctx.save();
+        ctx.strokeStyle = (Math.floor(this.timer * 20) % 2 === 0) ? '#ff0033' : '#ffaa00';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(btn.origX, btn.origY);
+        ctx.lineTo(btn.origX + Math.cos(btn.angle) * 800, btn.origY + Math.sin(btn.angle) * 800);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.translate(btn.x, btn.y);
+
+      if (btn.state === 'LAUNCHED') {
+        ctx.rotate(btn.angle);
+        ctx.fillStyle = '#cc0000';
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 2;
+      } else if (btn.state === 'AIMING') {
+        ctx.fillStyle = '#ff3333';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = '#d4d0c8';
+        ctx.strokeStyle = '#808080';
+        ctx.lineWidth = 1;
+      }
+
+      ctx.fillRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h);
+      ctx.strokeRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h);
+
+      ctx.fillStyle = (btn.state === 'LAUNCHED' || btn.state === 'AIMING') ? '#ffffff' : '#000000';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(btn.label, 0, 3);
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.buttons = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 24: RECYCLE BIN VORTEX (SPACE / GRAVITY CORRUPTION)
+// Giant Recycle Bin opens with high-intensity suction vortex!
+// -------------------------------------------------------------
+class RecycleBinVortexEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'recycleBinVortex',
+      name: 'Recycle Bin Vortex',
+      category: 'SPACE',
+      warningType: 'GRAVITY CORRUPTION',
+      duration: 6.0,
+      instruction: 'RECYCLE BIN VORTEX ACTIVE! RESIST THE GRAVITY PULL'
+    });
+    this.centerX = 320;
+    this.centerY = 220;
+    this.vortexTimer = 0;
+    this.swirlParticles = [];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.75,
+      speedMultiplier: 0.80
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.centerX = 320;
+    this.centerY = 220;
+    this.swirlParticles = [];
+
+    for (let i = 0; i < 30; i++) {
+      this.swirlParticles.push({
+        radius: 40 + Math.random() * 240,
+        angle: Math.random() * Math.PI * 2,
+        speed: 2.0 + Math.random() * 3.0,
+        size: 2 + Math.random() * 3,
+        color: Math.random() < 0.5 ? '#00ffff' : '#ff00ff'
+      });
+    }
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    // Telegraph phase during first 0.9s: 0 gravity force
+    const rampFactor = Math.max(0, Math.min(1, (this.timer - 0.9) / 0.8));
+
+    if (rampFactor > 0) {
+      this.vortexTimer += dt;
+      if (this.vortexTimer > 0.35) {
+        this.vortexTimer = 0;
+        if (typeof audio !== 'undefined') audio.playVortexHum();
+      }
+    }
+
+    const basePull = (this.difficulty === 'HARD') ? 85 : ((this.difficulty === 'NORMAL') ? 65 : 45);
+    const pullStrength = basePull * rampFactor;
+
+    if (player && player.isAlive && rampFactor > 0) {
+      const dx = this.centerX - player.x;
+      const dy = this.centerY - player.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 10) {
+        const force = (pullStrength / Math.max(80, dist)) * 260 * dt;
+        player.x += (dx / dist) * force;
+        player.y += (dy / dist) * force;
+      }
+
+      // Center damage active only after full summoning
+      if (dist < 28 && !player.isInvulnerable && rampFactor >= 0.8) {
+        player.takeDamage(15);
+        if (typeof audio !== 'undefined') audio.playHurt();
+        if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+      }
+    }
+
+    for (const p of this.swirlParticles) {
+      p.angle += p.speed * dt * (0.3 + rampFactor * 0.7);
+      p.radius -= (20 + 35 * rampFactor) * dt;
+      if (p.radius < 20) {
+        p.radius = 220 + Math.random() * 60;
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    // 0. Pre-activation Telegraph Summoning Reticle (timer < 0.9s)
+    if (this.timer < 0.9) {
+      const remain = Math.max(0, 0.9 - this.timer).toFixed(1);
+      ctx.save();
+      ctx.translate(this.centerX, this.centerY);
+
+      ctx.strokeStyle = (Math.floor(this.timer * 15) % 2 === 0) ? '#ff00ff' : '#00ffff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 80 + Math.sin(this.timer * 15) * 15, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(isKo ? '⚠️ [ 소환 중: 중심 이탈 ]' : '⚠️ [ SUMMONING: CLEAR CENTER ]', 0, -20);
+      ctx.fillText(`[ ${remain}s ]`, 0, 0);
+
+      ctx.restore();
+      ctx.restore();
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(this.centerX, this.centerY);
+
+    const pulseR = 30 + Math.sin(this.timer * 8) * 6;
+    const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, 240);
+    grad.addColorStop(0, 'rgba(150, 0, 255, 0.45)');
+    grad.addColorStop(0.5, 'rgba(0, 200, 255, 0.15)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 240, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.35)';
+    ctx.lineWidth = 2;
+    for (let a = 0; a < 3; a++) {
+      ctx.beginPath();
+      const baseA = this.timer * 3 + (a * Math.PI * 2 / 3);
+      for (let r = 20; r < 200; r += 10) {
+        const theta = baseA + (r * 0.03);
+        const sx = Math.cos(theta) * r;
+        const sy = Math.sin(theta) * r;
+        if (r === 20) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+    }
+
+    for (const p of this.swirlParticles) {
+      const sx = Math.cos(p.angle) * p.radius;
+      const sy = Math.sin(p.angle) * p.radius;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(sx - p.size / 2, sy - p.size / 2, p.size, p.size);
+    }
+
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff00ff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#d4d0c8';
+    ctx.fillRect(-18, -12, 36, 26);
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-18, -12, 36, 26);
+
+    ctx.save();
+    ctx.translate(-18, -14);
+    ctx.rotate(-0.35 + Math.sin(this.timer * 12) * 0.1);
+    ctx.fillStyle = '#0066aa';
+    ctx.fillRect(0, -6, 38, 6);
+    ctx.restore();
+
+    ctx.fillStyle = '#00aa00';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('♻️', 0, 6);
+
+    ctx.restore();
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.swirlParticles = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 25: CMD.EXE HACK ATTACK (ATTACK / CODE RAIN)
+// Command prompt opens at top, raining destructive code matrix missiles
+// -------------------------------------------------------------
+class CmdHackAttackEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'cmdHackAttack',
+      name: 'CMD.EXE Hack Attack',
+      category: 'ATTACK',
+      warningType: 'TERMINAL BREACH',
+      duration: 6.0,
+      instruction: 'COMMAND PROMPT ACTIVE: DODGE RAINING CODE MATRICES'
+    });
+    this.codeBlocks = [];
+    this.cmdTextLines = [
+      'C:\\WINDOWS> format c: /q /y',
+      'Executing purge_player.bat ...',
+      'KILL -9 ALL_SAFE_THREADS'
+    ];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.70,
+      speedMultiplier: 0.85
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.codeBlocks = [];
+
+    const isEasy = (this.difficulty === 'EASY');
+    const isHard = (this.difficulty === 'HARD');
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    this.cmdTextLines = isKo ? [
+      'C:\\WINDOWS> format c: /q /y',
+      'purge_player.bat 실행 중...',
+      '치명적 프로세스 강제 종료'
+    ] : [
+      'C:\\WINDOWS> format c: /q /y',
+      'Executing purge_player.bat ...',
+      'KILL -9 ALL_SAFE_THREADS'
+    ];
+
+    const count = isHard ? 12 : (isEasy ? 5 : 8);
+    const tokens = isKo 
+      ? ['오류_404', '널_포인터', '메모리_오류', '강제_종료', '포맷_C', '제거.EXE', '손상됨']
+      : ['ERR_404', 'NULL_PTR', 'SEG_FAULT', 'KILL_-9', 'FORMAT_C', 'PURGE.EXE', 'CORRUPT'];
+
+    for (let i = 0; i < count; i++) {
+      this.codeBlocks.push({
+        text: tokens[i % tokens.length],
+        x: 60 + Math.random() * 520,
+        y: 70,
+        w: 64,
+        h: 20,
+        fallSpeed: 180 + Math.random() * 120,
+        startTime: 0.8 + (i * (isHard ? 0.35 : 0.55)),
+        state: 'WAITING',
+        telegraphTime: 0.5,
+        warned: false
+      });
+    }
+
+    if (typeof audio !== 'undefined') audio.playTerminalClack();
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    for (const block of this.codeBlocks) {
+      if (block.state === 'DONE') continue;
+
+      if (this.timer >= block.startTime) {
+        const elapsed = this.timer - block.startTime;
+        if (elapsed < block.telegraphTime) {
+          block.state = 'TELEGRAPH';
+          if (!block.warned) {
+            block.warned = true;
+            if (typeof audio !== 'undefined') audio.playTerminalClack();
+          }
+        } else {
+          block.state = 'FALLING';
+          block.y += block.fallSpeed * dt;
+
+          if (player && player.isAlive && !player.isInvulnerable) {
+            const inX = (px >= block.x - block.w / 2 - player.radius && px <= block.x + block.w / 2 + player.radius);
+            const inY = (py >= block.y - block.h / 2 - player.radius && py <= block.y + block.h / 2 + player.radius);
+            if (inX && inY) {
+              player.takeDamage(15);
+              block.state = 'DONE';
+              if (typeof audio !== 'undefined') audio.playHurt();
+              if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+            }
+          }
+
+          if (block.y > 470) {
+            block.state = 'DONE';
+          }
+        }
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    const termW = 440;
+    const termH = 60;
+    const termX = 100;
+    const termY = 6;
+
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(termX, termY, termW, termH);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(termX, termY, termW, termH);
+
+    ctx.fillStyle = '#000080';
+    ctx.fillRect(termX, termY, termW, 14);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(isKo ? 'MS-DOS 프롬프트 — [cmd.exe]' : 'MS-DOS Prompt — [cmd.exe]', termX + 6, termY + 10);
+
+    ctx.fillStyle = '#00ff66';
+    ctx.font = '9px monospace';
+    const lineIndex = Math.min(2, Math.floor(this.timer * 1.5));
+    for (let i = 0; i <= lineIndex; i++) {
+      ctx.fillText(`> ${this.cmdTextLines[i]}`, termX + 8, termY + 26 + (i * 12));
+    }
+
+    for (const block of this.codeBlocks) {
+      if (block.state === 'DONE' || block.state === 'WAITING') continue;
+
+      if (block.state === 'TELEGRAPH') {
+        ctx.save();
+        ctx.strokeStyle = (Math.floor(this.timer * 20) % 2 === 0) ? '#00ff66' : '#ff0033';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(block.x, 70);
+        ctx.lineTo(block.x, 440);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ff0033';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isKo ? '⚠️ 낙하 주의' : '⚠️ DROP', block.x, 82);
+        ctx.restore();
+      } else if (block.state === 'FALLING') {
+        ctx.save();
+        ctx.translate(block.x, block.y);
+
+        ctx.fillStyle = '#002200';
+        ctx.fillRect(-block.w / 2, -block.h / 2, block.w, block.h);
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-block.w / 2, -block.h / 2, block.w, block.h);
+
+        ctx.fillStyle = '#00ff66';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(block.text, 0, 3);
+
+        ctx.restore();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.codeBlocks = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 26: HOSTILE CLIPPY (ATTACK / ASSISTANT BETRAYAL)
+// Retro paperclip assistant throws speech bubble bombs & charges zap tethers
+// -------------------------------------------------------------
+class HostileClippyEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'hostileClippy',
+      name: 'Hostile Clippy',
+      category: 'ATTACK',
+      warningType: 'OFFICE ASSISTANT',
+      duration: 6.0,
+      instruction: "CLIPPY DETECTED! DODGE THE ASSISTANT'S POPUPS & WIRES"
+    });
+    this.clippyX = 520;
+    this.clippyY = 140;
+    this.bombs = [];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.70,
+      speedMultiplier: 0.85
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.clippyX = 520;
+    this.clippyY = 140;
+    this.bombs = [];
+
+    const isEasy = (this.difficulty === 'EASY');
+    const isHard = (this.difficulty === 'HARD');
+    const bombCount = isHard ? 4 : (isEasy ? 2 : 3);
+
+    for (let i = 0; i < bombCount; i++) {
+      this.bombs.push({
+        throwTime: 1.0 + (i * (isHard ? 1.1 : 1.4)),
+        x: 520,
+        y: 140,
+        targetX: 140 + Math.random() * 360,
+        targetY: 120 + Math.random() * 240,
+        progress: 0,
+        exploded: false,
+        shards: []
+      });
+    }
+
+    if (typeof audio !== 'undefined') audio.playBootChirp();
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    this.clippyX = 480 + Math.sin(this.timer * 2.0) * 80;
+    this.clippyY = 140 + Math.cos(this.timer * 1.5) * 50;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    for (const bomb of this.bombs) {
+      if (this.timer >= bomb.throwTime && !bomb.exploded) {
+        bomb.progress += dt * 1.4;
+        bomb.x = this.clippyX + (bomb.targetX - this.clippyX) * Math.min(1, bomb.progress);
+        bomb.y = this.clippyY + (bomb.targetY - this.clippyY) * Math.min(1, bomb.progress) - Math.sin(bomb.progress * Math.PI) * 50;
+
+        if (bomb.progress >= 1.0) {
+          bomb.exploded = true;
+          if (typeof audio !== 'undefined') audio.playZipBurst();
+
+          const shardCount = (this.difficulty === 'HARD') ? 8 : 6;
+          for (let s = 0; s < shardCount; s++) {
+            const angle = (s * Math.PI * 2) / shardCount;
+            bomb.shards.push({
+              x: bomb.targetX,
+              y: bomb.targetY,
+              vx: Math.cos(angle) * 190,
+              vy: Math.sin(angle) * 190,
+              life: 1.2
+            });
+          }
+        }
+      }
+
+      for (const shard of bomb.shards) {
+        if (shard.life <= 0) continue;
+        shard.life -= dt;
+        shard.x += shard.vx * dt;
+        shard.y += shard.vy * dt;
+
+        if (player && player.isAlive && !player.isInvulnerable) {
+          if (Math.hypot(px - shard.x, py - shard.y) < player.radius + 6) {
+            player.takeDamage(15);
+            shard.life = 0;
+            if (typeof audio !== 'undefined') audio.playHurt();
+            if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+          }
+        }
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    ctx.save();
+    ctx.translate(this.clippyX, this.clippyY);
+
+    ctx.strokeStyle = '#c0c0c0';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-12, 18);
+    ctx.lineTo(-12, -14);
+    ctx.arc(0, -14, 12, Math.PI, 0, false);
+    ctx.lineTo(12, 14);
+    ctx.arc(4, 14, 8, 0, Math.PI, false);
+    ctx.lineTo(-4, -6);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-5, -10, 6, 0, Math.PI * 2);
+    ctx.arc(5, -10, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const lookX = this.player ? (this.player.x < this.clippyX ? -2 : 2) : 0;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-5 + lookX, -10, 2.5, 0, Math.PI * 2);
+    ctx.arc(5 + lookX, -10, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+    const bubbleW = 160;
+    const bubbleH = 44;
+    ctx.fillStyle = '#ffffe1';
+    ctx.fillRect(-bubbleW - 15, -30, bubbleW, bubbleH);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-bubbleW - 15, -30, bubbleW, bubbleH);
+
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 8.5px monospace';
+    ctx.textAlign = 'left';
+    if (isKo) {
+      ctx.fillText('살아남으려 하시는군요!', -bubbleW - 8, -16);
+      ctx.fillText('죽는 것을 도와드릴까요?', -bubbleW - 8, -4);
+    } else {
+      ctx.fillText('Trying to survive?', -bubbleW - 8, -16);
+      ctx.fillText('Would you like help dying?', -bubbleW - 8, -4);
+    }
+
+    ctx.restore();
+
+    for (const bomb of this.bombs) {
+      if (this.timer >= bomb.throwTime && !bomb.exploded) {
+        ctx.save();
+        ctx.translate(bomb.x, bomb.y);
+
+        ctx.fillStyle = '#ff3333';
+        ctx.fillRect(-14, -10, 28, 20);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-14, -10, 28, 20);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isKo ? '💥 확인' : '💥 OK', 0, 3);
+
+        ctx.restore();
+      }
+
+      for (const shard of bomb.shards) {
+        if (shard.life <= 0) continue;
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.arc(shard.x, shard.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.bombs = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 27: BOUNCING SCREENSAVER (SPACE / BOUNCING HAZARD)
+// Retro DVD-style error screensaver bouncing off arena walls with spark bursts!
+// -------------------------------------------------------------
+class BouncingScreensaverEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'bouncingScreensaver',
+      name: 'Bouncing Screensaver',
+      category: 'SPACE',
+      warningType: 'SCREENSAVER ACTIVE',
+      duration: 6.0,
+      instruction: 'SCREENSAVER BOUNCING! DODGE WALL-IMPACT SPARKS'
+    });
+    this.boxes = [];
+    this.sparks = [];
+    this.colorPalette = ['#00ffff', '#ff00ff', '#ffff00', '#00ff66', '#ff6600'];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.75,
+      speedMultiplier: 0.80
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.boxes = [];
+    this.sparks = [];
+
+    const isHard = (this.difficulty === 'HARD');
+    const count = isHard ? 2 : 1;
+
+    for (let i = 0; i < count; i++) {
+      this.boxes.push({
+        x: 120 + i * 200,
+        y: 100 + i * 100,
+        vx: (i === 0 ? 1 : -1) * (isHard ? 260 : 210),
+        vy: 180 + Math.random() * 50,
+        w: 90,
+        h: 44,
+        colorIdx: i,
+        hitCooldown: 0
+      });
+    }
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    for (const box of this.boxes) {
+      if (box.hitCooldown > 0) box.hitCooldown -= dt;
+
+      box.x += box.vx * dt;
+      box.y += box.vy * dt;
+
+      let bounced = false;
+
+      if (box.x - box.w / 2 <= 0) {
+        box.x = box.w / 2;
+        box.vx = Math.abs(box.vx) * 1.02;
+        bounced = true;
+      } else if (box.x + box.w / 2 >= 640) {
+        box.x = 640 - box.w / 2;
+        box.vx = -Math.abs(box.vx) * 1.02;
+        bounced = true;
+      }
+
+      if (box.y - box.h / 2 <= 0) {
+        box.y = box.h / 2;
+        box.vy = Math.abs(box.vy) * 1.02;
+        bounced = true;
+      } else if (box.y + box.h / 2 >= 440) {
+        box.y = 440 - box.h / 2;
+        box.vy = -Math.abs(box.vy) * 1.02;
+        bounced = true;
+      }
+
+      if (bounced) {
+        box.colorIdx = (box.colorIdx + 1) % this.colorPalette.length;
+        if (typeof audio !== 'undefined') audio.playBouncePop();
+
+        for (let s = 0; s < 6; s++) {
+          const a = Math.random() * Math.PI * 2;
+          this.sparks.push({
+            x: box.x,
+            y: box.y,
+            vx: Math.cos(a) * (120 + Math.random() * 80),
+            vy: Math.sin(a) * (120 + Math.random() * 80),
+            life: 0.8,
+            color: this.colorPalette[box.colorIdx]
+          });
+        }
+      }
+
+      if (player && player.isAlive && !player.isInvulnerable && box.hitCooldown <= 0) {
+        const inX = (px >= box.x - box.w / 2 - player.radius && px <= box.x + box.w / 2 + player.radius);
+        const inY = (py >= box.y - box.h / 2 - player.radius && py <= box.y + box.h / 2 + player.radius);
+        if (inX && inY) {
+          box.hitCooldown = 0.6;
+          player.takeDamage(20);
+          if (typeof audio !== 'undefined') audio.playHurt();
+          if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+        }
+      }
+    }
+
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const sp = this.sparks[i];
+      sp.life -= dt;
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+
+      if (player && player.isAlive && !player.isInvulnerable) {
+        if (Math.hypot(px - sp.x, py - sp.y) < player.radius + 4) {
+          player.takeDamage(10);
+          sp.life = 0;
+          if (typeof audio !== 'undefined') audio.playHurt();
+          if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+        }
+      }
+
+      if (sp.life <= 0) this.sparks.splice(i, 1);
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    for (const box of this.boxes) {
+      const color = this.colorPalette[box.colorIdx];
+      ctx.save();
+      ctx.translate(box.x, box.y);
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-box.w / 2, -box.h / 2, box.w, box.h);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+      ctx.fillStyle = color;
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(isKo ? '💿 화면보호기' : '💿 SAVER', 0, 4);
+
+      ctx.restore();
+    }
+
+    for (const sp of this.sparks) {
+      ctx.fillStyle = sp.color;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.boxes = [];
+    this.sparks = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 28: SHADOW CLONE EXE (INPUT / MIRROR THREAT)
+// Glitch shadow duplicate copies player movement, trailing danger flames!
+// -------------------------------------------------------------
+class ShadowCloneEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'shadowClone',
+      name: 'Shadow Clone EXE',
+      category: 'INPUT',
+      warningType: 'MIRROR PROCESS',
+      duration: 5.5,
+      instruction: 'SHADOW_PLAYER.EXE COPIES YOU! AVOID CROSSING ITS PATH'
+    });
+    this.cloneX = 320;
+    this.cloneY = 220;
+    this.trailNodes = [];
+    this.trailInterval = 0;
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.75,
+      speedMultiplier: 0.85
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+    this.cloneX = 640 - px;
+    this.cloneY = 440 - py;
+    this.trailNodes = [];
+    this.trailInterval = 0;
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    this.cloneX = 640 - px;
+    this.cloneY = 440 - py;
+
+    this.trailInterval += dt;
+    if (this.trailInterval > 0.12) {
+      this.trailInterval = 0;
+      this.trailNodes.push({
+        x: this.cloneX,
+        y: this.cloneY,
+        life: 1.4
+      });
+    }
+
+    for (let i = this.trailNodes.length - 1; i >= 0; i--) {
+      const node = this.trailNodes[i];
+      node.life -= dt;
+
+      if (player && player.isAlive && !player.isInvulnerable) {
+        if (Math.hypot(px - node.x, py - node.y) < player.radius + 8) {
+          player.takeDamage(15);
+          node.life = 0;
+          if (typeof audio !== 'undefined') audio.playHurt();
+          if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+        }
+      }
+
+      if (node.life <= 0) this.trailNodes.splice(i, 1);
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    for (const node of this.trailNodes) {
+      const alpha = Math.max(0, node.life / 1.4);
+      ctx.fillStyle = `rgba(255, 30, 0, ${alpha * 0.75})`;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.translate(this.cloneX, this.cloneY);
+
+    ctx.fillStyle = '#ff0033';
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+    ctx.fillStyle = '#ff0033';
+    ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isKo ? '그림자.EXE' : 'SHADOW.EXE', 0, -14);
+
+    ctx.restore();
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.trailNodes = [];
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT 29: SELECTION BOX DRAG (SPACE / PURGE ZONE)
+// Blue desktop selection box drags out, electrifying the selected area!
+// -------------------------------------------------------------
+class SelectionBoxDragEvent extends BaseInterferenceEvent {
+  constructor() {
+    super({
+      id: 'selectionBoxDrag',
+      name: 'Selection Box Drag',
+      category: 'SPACE',
+      warningType: 'SELECTION BOX',
+      duration: 6.0,
+      instruction: 'SELECTION BOX DRAGGING! ESCAPE THE PURGE AREA'
+    });
+    this.boxes = [];
+  }
+
+  getBulletModifier() {
+    return {
+      densityMultiplier: 0.65,
+      speedMultiplier: 0.80
+    };
+  }
+
+  start(director, player, hazards) {
+    super.start(director, player, hazards);
+    this.boxes = [];
+
+    const isHard = (this.difficulty === 'HARD');
+    const count = isHard ? 3 : 2;
+    const interval = isHard ? 1.8 : 2.5;
+
+    for (let i = 0; i < count; i++) {
+      const w = 260 + Math.random() * 140;
+      const h = 180 + Math.random() * 100;
+      const x = 50 + Math.random() * (590 - w);
+      const y = 40 + Math.random() * (400 - h);
+
+      this.boxes.push({
+        x: x,
+        y: y,
+        w: w,
+        h: h,
+        startTime: 0.4 + (i * interval),
+        countdownDuration: isHard ? 1.0 : 1.3,
+        purgeDuration: 0.6,
+        state: 'WAITING',
+        purged: false
+      });
+    }
+  }
+
+  update(dt, player, hazards) {
+    super.update(dt, player, hazards);
+    if (this.isCompleted) return;
+
+    const px = player ? player.x : 320;
+    const py = player ? player.y : 220;
+
+    for (const b of this.boxes) {
+      if (b.state === 'DONE') continue;
+
+      if (this.timer >= b.startTime) {
+        const elapsed = this.timer - b.startTime;
+        if (elapsed < b.countdownDuration) {
+          b.state = 'DRAGGING';
+        } else if (elapsed < b.countdownDuration + b.purgeDuration) {
+          b.state = 'PURGING';
+          if (!b.purged) {
+            b.purged = true;
+            if (typeof audio !== 'undefined') audio.playSelectionPurge();
+          }
+
+          if (player && player.isAlive && !player.isInvulnerable) {
+            if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
+              player.takeDamage(20);
+              if (typeof audio !== 'undefined') audio.playHurt();
+              if (window.game && window.game.onPlayerHit) window.game.onPlayerHit();
+            }
+          }
+        } else {
+          b.state = 'DONE';
+        }
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.isCompleted) return;
+    ctx.save();
+
+    const isKo = (typeof currentLanguage !== 'undefined' && currentLanguage === 'ko');
+
+    for (const b of this.boxes) {
+      if (b.state === 'WAITING' || b.state === 'DONE') continue;
+
+      if (b.state === 'DRAGGING') {
+        const elapsed = this.timer - b.startTime;
+        const remain = Math.max(0, b.countdownDuration - elapsed).toFixed(1);
+
+        ctx.fillStyle = 'rgba(0, 102, 204, 0.30)';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+
+        ctx.strokeStyle = '#0055ff';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isKo ? `⚠️ [ 삭제 ${remain}s: 영역 이탈 ]` : `⚠️ [ PURGE ${remain}s: ESCAPE BOX ]`, b.x + b.w / 2, b.y + b.h / 2);
+      } else if (b.state === 'PURGING') {
+        ctx.fillStyle = (Math.floor(this.timer * 25) % 2 === 0) ? 'rgba(255, 0, 50, 0.65)' : 'rgba(255, 255, 255, 0.65)';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  onEnd() {
+    this.boxes = [];
+  }
+}
+
 // ============================================================================
 // 3. CENTRAL EVENT DIRECTOR (BETA v0.4 REFINED)
 // ============================================================================
@@ -2170,7 +3595,7 @@ class EventDirector {
     this.autoEventsEnabled = true;
     this.lastEventId = null;
 
-    // Complete Event Registry (22 Curated & Polished Events)
+    // Complete Event Registry (26 Curated & Polished Events)
     this.eventRegistry = [
       PopupHellEvent,
       ReversedControlsEvent,
@@ -2182,18 +3607,22 @@ class EventDirector {
       TaskbarMalfunctionEvent,
       UIInvasionEvent,
       ColorErrorEvent,
-      TitleBarDropEvent,
       ScreenTearingEvent,
       NotificationSpamEvent,
       MouseTrailEvent,
-      WindowGhostEvent,
-      ScrollbarMalfunctionEvent,
       ZipBombEvent,
       ErrorLaserEvent,
       AntivirusScanEvent,
       DeleteKeyEvent,
       FirewallEvent,
-      BlueScreenBgEvent
+      BlueScreenBgEvent,
+      StartMenuBarrageEvent,
+      RecycleBinVortexEvent,
+      CmdHackAttackEvent,
+      HostileClippyEvent,
+      BouncingScreensaverEvent,
+      ShadowCloneEvent,
+      SelectionBoxDragEvent
     ];
   }
 
@@ -2576,6 +4005,16 @@ class EventDirector {
         this.activeEvent.drawBackground(ctx);
       } catch (e) {
         console.error("Event drawBackground error:", e);
+      }
+    }
+  }
+
+  drawFloor(ctx) {
+    if (this.activeEvent && typeof this.activeEvent.drawFloor === 'function') {
+      try {
+        this.activeEvent.drawFloor(ctx);
+      } catch (e) {
+        console.error("Event drawFloor error:", e);
       }
     }
   }
