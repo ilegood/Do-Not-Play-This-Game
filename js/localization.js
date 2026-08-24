@@ -22,7 +22,7 @@ const LOCALIZATION = {
       exit: "EXIT",
       exitNotice: "Good choice.\n\nUnfortunately, that button doesn't work.",
       langLabel: "Language:",
-      instructions: "WASD — MOVE | DON'T GET HIT",
+      instructions: "WASD: MOVE | ESC: PAUSE",
       bestScore: "BEST SCORE:",
       bestRank: "BEST RANK:",
       bestStreak: "BEST STREAK:"

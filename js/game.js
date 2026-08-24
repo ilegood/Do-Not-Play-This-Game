@@ -1639,7 +1639,7 @@ Rank S Comment: ${getLoc('ranks', 'S')}
 
       const countSub = document.getElementById('countdown-subtext');
       if (countSub) {
-        countSub.textContent = currentLanguage === 'ko' ? "WASD로 이동 | 맞지 마" : "WASD TO MOVE | DON'T GET HIT";
+        countSub.textContent = currentLanguage === 'ko' ? "WASD: 이동" : "WASD: MOVE";
       }
 
       const showStep = (text, isFinal = false) => {
