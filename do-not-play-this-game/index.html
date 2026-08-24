@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DO NOT PLAY THIS GAME</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Retro Boot Sequence Screen (Initial Launch 2.5s) -->
+  <div class="boot-screen" id="boot-screen">
+    <div class="boot-terminal-content">
+      <p class="boot-line" id="boot-l1"></p>
+      <p class="boot-line" id="boot-l2"></p>
+      <p class="boot-line" id="boot-l3"></p>
+      <p class="boot-line" id="boot-l4"></p>
+      <p class="boot-line" id="boot-l5"></p>
+      <div class="boot-skip-hint" id="boot-skip-hint">[ Press Space, Enter, or Click to Skip ]</div>
+    </div>
+    <div class="boot-scanlines"></div>
+  </div>
+
+  <!-- Fake Windows 98 Desktop Environment -->
+  <div class="desktop-wallpaper" id="desktop">
+
+    <!-- Desktop Icons (Decorative Retro Elements) -->
+    <div class="desktop-icons-container">
+      <div class="desktop-icon" id="icon-my-computer">
+        <div class="icon-img icon-computer"></div>
+        <span class="icon-label" id="icon-label-comp">My Computer</span>
+      </div>
+      <div class="desktop-icon" id="icon-readme">
+        <div class="icon-img icon-txt"></div>
+        <span class="icon-label">DO_NOT_OPEN.txt</span>
+      </div>
+      <div class="desktop-icon" id="icon-recycle-bin">
+        <div class="icon-img icon-trash"></div>
+        <span class="icon-label" id="icon-label-trash">Recycle Bin</span>
+      </div>
+      <div class="desktop-icon icon-selected" id="icon-game">
+        <div class="icon-img icon-exe"></div>
+        <span class="icon-label">DO_NOT_PLAY.exe</span>
+      </div>
+    </div>
+
+    <!-- Main Game Window Container -->
+    <div class="win98-window win98-box-outset" id="main-game-window">
+      <!-- Title Bar -->
+      <div class="win98-titlebar" id="window-titlebar">
+        <div class="titlebar-left">
+          <span class="title-icon">⚠️</span>
+          <span class="title-text" id="window-title-text">DO NOT PLAY THIS GAME — [Demo v0.5]</span>
+        </div>
+        <div class="titlebar-controls">
+          <button class="win98-btn titlebar-btn" id="btn-minimize" title="Minimize">_</button>
+          <button class="win98-btn titlebar-btn" id="btn-maximize" title="Maximize">□</button>
+          <button class="win98-btn titlebar-btn btn-close" id="btn-close" title="Close">✕</button>
+        </div>
+      </div>
+
+      <!-- Window Menu Bar -->
+      <div class="win98-menubar">
+        <div class="menubar-item" id="menu-file"><u>F</u>ile</div>
+        <div class="menubar-item" id="menu-options"><u>O</u>ptions</div>
+        <div class="menubar-item" id="menu-help"><u>H</u>elp</div>
+      </div>
+
+      <!-- Game Viewport Container -->
+      <div class="game-viewport-wrapper" id="game-viewport-wrapper">
+        <div class="game-canvas-container" id="game-canvas-container">
+          <!-- Main Canvas -->
+          <canvas id="gameCanvas" width="640" height="440"></canvas>
+
+          <!-- Start Countdown Overlay (3, 2, 1, SURVIVE!) -->
+          <div class="countdown-overlay" id="countdown-overlay" style="display: none;">
+            <div class="countdown-text" id="countdown-text">3</div>
+            <div class="countdown-subtext" id="countdown-subtext">WASD TO MOVE | DON'T GET HIT</div>
+          </div>
+
+          <!-- Warning Telegraph Banner (0.8s before interference event) -->
+          <div class="event-warning-banner" id="event-warning-banner" style="display: none;">
+            <span class="warning-icon-flash">⚠️</span>
+            <span id="event-warning-text">SYSTEM ERROR</span>
+          </div>
+
+          <!-- Event Instruction Banner -->
+          <div class="event-instruction-banner" id="event-instruction-banner" style="display: none;">
+            <div class="instruction-icon">⚡</div>
+            <span id="event-instruction-text">EVENT INSTRUCTION</span>
+            <div class="event-timer-bar-wrap">
+              <div class="event-timer-bar" id="event-timer-bar"></div>
+            </div>
+          </div>
+
+          <!-- Event Feedback Toast (e.g. "CLEAR") -->
+          <div class="event-feedback-banner" id="event-feedback-banner" style="display: none;">
+            <span id="event-feedback-text">CLEAR</span>
+          </div>
+
+          <!-- Combo Milestone Toast (e.g. "NOT BAD.", "WHY ARE YOU GOOD AT THIS?") -->
+          <div class="combo-milestone-toast" id="combo-milestone-toast" style="display: none;">
+            <span id="combo-milestone-text">NOT BAD.</span>
+          </div>
+
+          <!-- Pop-up Hell Dynamic Container (Event 01) -->
+          <div id="popup-hell-container" class="event-overlay-layer"></div>
+
+          <!-- Notification Spam Dynamic Container (Event: Notification Spam) -->
+          <div id="notification-spam-container" class="event-overlay-layer"></div>
+
+          <!-- Fake Retro Scrollbars (Event: Scrollbar Malfunction) -->
+          <div id="fake-scrollbar-v" class="fake-retro-scrollbar-v" style="display: none;">
+            <div class="sb-arrow-btn">▲</div>
+            <div class="sb-track"><div class="sb-thumb" id="sb-thumb-v"></div></div>
+            <div class="sb-arrow-btn">▼</div>
+          </div>
+          <div id="fake-scrollbar-h" class="fake-retro-scrollbar-h" style="display: none;">
+            <div class="sb-arrow-btn">◀</div>
+            <div class="sb-track-h"><div class="sb-thumb-h" id="sb-thumb-h"></div></div>
+            <div class="sb-arrow-btn">▶</div>
+          </div>
+
+          <!-- Fake Windows Update Dialog (Event 05) -->
+          <div class="fake-update-dialog win98-box-outset" id="fake-update-dialog" style="display: none;">
+            <div class="popup-titlebar">
+              <span id="update-dialog-title">⚙️ Windows System Update</span>
+            </div>
+            <div class="update-dialog-body">
+              <div class="update-icon-row">
+                <div class="update-hourglass-icon">⏳</div>
+                <div class="update-text-area">
+                  <p id="update-status-msg">Installing important system update...</p>
+                  <div class="update-progress-outer win98-box-inset">
+                    <div class="update-progress-fill" id="update-progress-fill" style="width: 0%;"></div>
+                  </div>
+                  <div class="update-pct-row">
+                    <span id="update-pct-text">0%</span>
+                    <span class="update-subnote" id="update-subnote">Please do not turn off your computer</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Signal CRT Noise Overlay (Event 06) -->
+          <div class="no-signal-overlay" id="no-signal-overlay" style="display: none;">
+            <div class="static-scanline"></div>
+            <div class="no-signal-tag" id="no-signal-tag">NO SIGNAL [CHANNEL 03]</div>
+          </div>
+
+          <!-- Title Bar Drop Obstacle (Event 14) -->
+          <div class="title-drop-obstacle win98-titlebar" id="title-drop-obstacle" style="display: none;">
+            <div class="titlebar-left">
+              <span class="title-icon">⚠️</span>
+              <span id="title-drop-text">TITLE_BAR_DETACHED.EXE</span>
+            </div>
+            <div class="titlebar-controls">
+              <button class="win98-btn titlebar-btn">✕</button>
+            </div>
+          </div>
+
+          <!-- Taskbar Malfunction Rising Overlay (Event 15) -->
+          <div class="taskbar-rise-overlay win98-box-outset" id="taskbar-rise-overlay" style="display: none;">
+            <div class="taskbar-rise-content">
+              <span id="taskbar-rise-text">⚠️ TASKBAR OVERFLOW ERROR</span>
+            </div>
+          </div>
+
+          <!-- Fatal Error Death Dialog (HP 0 Transition) -->
+          <div class="fatal-error-dialog win98-box-outset" id="fatal-error-dialog" style="display: none;">
+            <div class="popup-titlebar fatal-titlebar">
+              <span id="fatal-dialog-title">💥 FATAL SYSTEM ERROR</span>
+            </div>
+            <div class="fatal-dialog-body">
+              <div class="error-dialog-icon">💣</div>
+              <div>
+                <p><strong id="fatal-dialog-bold">FATAL ERROR</strong></p>
+                <p id="fatal-dialog-desc">Player.exe has stopped responding.</p>
+              </div>
+            </div>
+            <div class="exit-dialog-actions">
+              <button class="win98-btn fatal-ok-btn" id="fatal-error-ok">OK</button>
+            </div>
+          </div>
+
+          <!-- S-Rank Victory Dialog (Rank S) -->
+          <div class="s-rank-dialog win98-box-outset" id="s-rank-dialog" style="display: none;">
+            <div class="popup-titlebar">
+              <span id="s-rank-title">🏆 CONGRATULATIONS!</span>
+            </div>
+            <div class="s-rank-body">
+              <div class="s-rank-trophy">🎖️</div>
+              <div>
+                <p><strong id="s-rank-bold">CONGRATULATIONS</strong></p>
+                <p id="s-rank-desc">You successfully ignored every warning.<br><br>We're disappointed in you.</p>
+              </div>
+            </div>
+            <div class="exit-dialog-actions">
+              <button class="win98-btn" id="s-rank-ok-btn">OK</button>
+            </div>
+          </div>
+
+          <!-- Generic Desktop Info Dialog -->
+          <div class="exit-dialog win98-box-outset" id="desktop-info-dialog" style="display: none; z-index: 75;">
+            <div class="popup-titlebar">
+              <span id="info-dialog-title">System Information</span>
+              <button class="popup-close-btn" id="info-dialog-close">✕</button>
+            </div>
+            <div class="exit-dialog-body">
+              <div class="error-dialog-icon" id="info-dialog-icon">ℹ️</div>
+              <div>
+                <p id="info-dialog-text">Information message text.</p>
+              </div>
+            </div>
+            <div class="exit-dialog-actions">
+              <button class="win98-btn" id="info-dialog-ok">OK</button>
+            </div>
+          </div>
+
+          <!-- Exit Refusal Dialog -->
+          <div class="exit-dialog win98-box-outset" id="exit-refusal-dialog" style="display: none;">
+            <div class="popup-titlebar">
+              <span id="exit-dialog-title">System Alert</span>
+              <button class="popup-close-btn" id="exit-dialog-close">✕</button>
+            </div>
+            <div class="exit-dialog-body">
+              <div class="error-dialog-icon">🛑</div>
+              <div>
+                <p><strong id="exit-dialog-bold">Good choice.</strong></p>
+                <p id="exit-dialog-desc">Unfortunately, that button doesn't work.</p>
+              </div>
+            </div>
+            <div class="exit-dialog-actions">
+              <button class="win98-btn" id="exit-dialog-ok">OK</button>
+            </div>
+          </div>
+
+          <!-- Title Screen Overlay -->
+          <div class="win98-screen-overlay" id="title-screen">
+            <div class="title-content-box win98-box-inset">
+              <div class="title-warning-icon">⛔</div>
+              <h1 class="game-title">DO NOT PLAY THIS GAME</h1>
+              <p class="game-subtitle">Seriously.<br>Close this program.</p>
+
+              <div class="title-btn-group">
+                <button class="win98-btn play-btn" id="btn-play-game">PLAY</button>
+                <button class="win98-btn exit-btn" id="btn-exit-game">EXIT</button>
+              </div>
+
+              <div class="title-records-box win98-box-outset">
+                <div class="record-item">
+                  <span class="record-label" id="title-lbl-best-score">BEST SCORE:</span>
+                  <span class="record-val" id="title-best-score">0</span>
+                </div>
+                <div class="record-item">
+                  <span class="record-label" id="title-lbl-best-rank">BEST RANK:</span>
+                  <span class="record-badge" id="title-best-rank">-</span>
+                </div>
+                <div class="record-item">
+                  <span class="record-label" id="title-lbl-best-streak">BEST STREAK:</span>
+                  <span class="record-val text-cyan" id="title-best-streak">0</span>
+                </div>
+              </div>
+
+              <div class="title-options">
+                <span class="lang-selector-label" id="title-lang-label">Language:</span>
+                <button class="win98-btn btn-sm lang-active" id="lang-btn-en">English</button>
+                <button class="win98-btn btn-sm" id="lang-btn-ko">한국어</button>
+              </div>
+
+              <div class="title-instructions">
+                <p id="title-instruction-text">WASD — MOVE | DON'T GET HIT | ESC to Pause</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Game Over Screen Overlay -->
+          <div class="win98-screen-overlay" id="gameover-screen" style="display: none;">
+            <div class="gameover-content-box win98-box-outset">
+              <div class="gameover-titlebar">
+                <span>CRITICAL_SYSTEM_FAILURE.EXE</span>
+              </div>
+              <div class="gameover-body">
+                <div class="gameover-skull">💀</div>
+                <h2 class="gameover-heading" id="go-text-died">YOU DIED.</h2>
+                <p class="gameover-subtext" id="go-text-told">I told you not to play.</p>
+
+                <div class="gameover-stats win98-box-inset">
+                  <div class="stat-row">
+                    <span class="stat-label" id="go-lbl-score">SCORE:</span>
+                    <span class="stat-value" id="go-score-val">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label" id="go-lbl-best">BEST:</span>
+                    <span class="stat-value text-gold" id="go-best-score-val">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label" id="go-lbl-time">TIME:</span>
+                    <span class="stat-value" id="go-time-val">00:00</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label" id="go-lbl-survived">SURVIVED:</span>
+                    <span class="stat-value text-cyan" id="go-events-val">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label" id="go-lbl-streak">BEST STREAK:</span>
+                    <span class="stat-value text-cyan" id="go-max-streak-val">×0</span>
+                  </div>
+                  <div class="stat-divider"></div>
+                  <div class="stat-rank-row">
+                    <span class="rank-label" id="go-lbl-rank">RANK:</span>
+                    <span class="rank-badge" id="go-rank-badge">F</span>
+                  </div>
+                  <p class="rank-comment" id="go-rank-comment">"UNINSTALL THE GAME."</p>
+                </div>
+
+                <div class="gameover-actions">
+                  <button class="win98-btn replay-btn" id="btn-replay">DON'T</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pause Screen Overlay -->
+          <div class="win98-screen-overlay pause-overlay" id="pause-screen" style="display: none;">
+            <div class="pause-box win98-box-outset">
+              <div class="pause-titlebar">
+                <span id="pause-title">SYSTEM_PAUSED.EXE</span>
+              </div>
+              <div class="pause-body">
+                <h3 id="pause-heading">PAUSED</h3>
+                <p id="pause-desc">Take your time.<br>The bullets will still be waiting for you.</p>
+                <button class="win98-btn" id="btn-resume">Resume</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Window Status Bar -->
+      <div class="win98-statusbar" id="win-statusbar">
+        <div class="status-panel status-msg" id="hud-status-msg">DODGE THE BULLETS!</div>
+        <div class="status-panel status-combo" id="hud-streak-panel">STREAK: ×0</div>
+        <div class="status-panel status-time" id="hud-time">TIME: 00:00</div>
+        <div class="status-panel status-score" id="hud-score">SCORE: 0</div>
+        <div class="status-panel status-hp-container">
+          <span class="hp-label">HP:</span>
+          <div class="hp-bar-outer win98-box-inset" id="hud-hp-panel">
+            <div class="hp-bar-fill" id="hud-hp-fill" style="width: 100%;"></div>
+          </div>
+          <span class="hp-number" id="hud-hp-text">100</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer Debug Toolkit Window (F2 / ~) -->
+    <div class="debug-window win98-box-outset" id="debug-window" style="display: none;">
+      <div class="popup-titlebar" id="debug-titlebar" style="cursor: grab;">
+        <span id="dbg-lbl-title">🛠️ DEVELOPER DEBUG TOOLKIT [F2]</span>
+        <div style="display: flex; gap: 3px; align-items: center;">
+          <button class="win98-btn btn-xs" id="dbg-opacity-btn" title="Toggle Opacity (100% / 70% / 40%)" style="font-size: 10px; padding: 0 4px;">👁️</button>
+          <button class="win98-btn btn-xs" id="dbg-min-btn" title="Minimize / Restore" style="font-weight: bold; width: 16px;">_</button>
+          <button class="win98-btn btn-xs" id="dbg-dock-btn" title="Toggle Compact / Expanded">🗖</button>
+          <button class="popup-close-btn" id="debug-close-btn">✕</button>
+        </div>
+      </div>
+      
+      <div class="debug-body dbg-toolkit-container" id="dbg-body">
+        <!-- Global Actions Bar -->
+        <div class="dbg-section dbg-global-bar win98-box-inset">
+          <button class="win98-btn btn-sm btn-danger-hint" id="dbg-reset-all-btn" title="Restore clean test state">🔄 RESET ALL</button>
+          <button class="win98-btn btn-sm" id="dbg-end-event-btn" title="End currently active event & trigger cleanup">⏹ END EVENT</button>
+          <button class="win98-btn btn-sm" id="dbg-pause-toggle-btn">⏸ PAUSE TEST</button>
+          <button class="win98-btn btn-sm" id="dbg-heal-btn">💚 FULL HP</button>
+          <button class="win98-btn btn-sm" id="dbg-damage-btn">💔 -20 HP</button>
+          <button class="win98-btn btn-sm" id="dbg-invincible-toggle-btn" style="color: #666;">🛡️ INVINCIBLE: OFF</button>
+          <button class="win98-btn btn-sm" id="dbg-pres-mode-btn" title="Reset for Spectators">🎪 DEMO RESET</button>
+        </div>
+
+        <!-- Live Status & Director Row -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-director">📡 EVENT DIRECTOR & LIVE STATUS</strong>
+            <button class="win98-btn btn-xs" id="dbg-auto-events-btn" style="color: #008800; font-weight: bold;">AUTO EVENTS: ON</button>
+          </div>
+          <div class="dbg-status-grid">
+            <div><strong id="dbg-lbl-director">Director:</strong> <span id="dbg-director-state" class="dbg-val">NORMAL_BULLETS</span></div>
+            <div><strong id="dbg-lbl-next">Next Event:</strong> <span id="dbg-director-next" class="dbg-val">10.0s</span></div>
+            <div><strong id="dbg-lbl-active">Active Event:</strong> <span id="dbg-active-event-name" class="dbg-val-bold">None</span></div>
+            <div><strong id="dbg-lbl-time">Time:</strong> <span id="dbg-active-event-time" class="dbg-val">0.0s / 0.0s</span></div>
+            <div><strong id="dbg-lbl-diff">Event Diff:</strong> <span id="dbg-active-event-diff" class="dbg-val">NORMAL</span></div>
+            <div><strong id="dbg-lbl-survived">Survived:</strong> <span id="dbg-director-survived" class="dbg-val">0</span></div>
+          </div>
+        </div>
+
+        <!-- Dynamic Event Testing Lab -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-lab">🎯 INTERFERENCE EVENT LAB</strong>
+            <div class="dbg-filter-controls">
+              <input type="text" id="dbg-event-search" placeholder="Search events..." class="dbg-input" style="width: 100px;">
+              <select id="dbg-category-filter" class="dbg-select">
+                <option value="ALL">ALL</option>
+                <option value="ATTACK">ATTACK</option>
+                <option value="VISION">VISION</option>
+                <option value="INPUT">INPUT</option>
+                <option value="SPACE">SPACE</option>
+                <option value="WINDOW">WINDOW</option>
+                <option value="VISUAL">VISUAL</option>
+              </select>
+              <select id="dbg-event-diff-select" class="dbg-select">
+                <option value="EASY">EASY</option>
+                <option value="NORMAL" selected>NORMAL</option>
+                <option value="HARD">HARD</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamically Populated Event Registry List -->
+          <div class="dbg-event-table-wrap">
+            <table class="dbg-event-table">
+              <thead>
+                <tr>
+                  <th style="width: 38%;" id="dbg-th-name">Event Name</th>
+                  <th style="width: 22%;" id="dbg-th-cat">Category</th>
+                  <th style="width: 22%;" id="dbg-th-status">Status</th>
+                  <th style="width: 18%;" id="dbg-th-action">Action</th>
+                </tr>
+              </thead>
+              <tbody id="dbg-event-tbody">
+                <!-- Dynamic rows from eventRegistry -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Automated Sequence Runner -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-seq">⚡ AUTOMATED SEQUENCE RUNNER</strong>
+            <div class="dbg-btn-group">
+              <button class="win98-btn btn-xs" id="dbg-run-all-events-btn">▶ RUN ALL EVENTS</button>
+              <button class="win98-btn btn-xs" id="dbg-run-all-variants-btn">▶ TEST ALL VARIANTS</button>
+              <button class="win98-btn btn-xs btn-danger-hint" id="dbg-stop-sequence-btn">⏹ STOP</button>
+            </div>
+          </div>
+          <div class="dbg-queue-container" id="dbg-sequence-queue">
+            <span id="dbg-seq-idle" style="color: #666;">Sequence idle. Click [RUN ALL EVENTS] to execute.</span>
+          </div>
+        </div>
+
+        <!-- Bullet Testing & Combination Lab -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-bullet">💥 BULLET & FAIRNESS TESTING</strong>
+          </div>
+          <div class="dbg-control-row">
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <label id="dbg-lbl-bullet-spawn">Bullet Spawning:</label>
+              <select id="dbg-bullet-diff-select" class="dbg-select">
+                <option value="AUTO" selected>AUTO (Time-based)</option>
+                <option value="OFF">OFF (No Bullets)</option>
+                <option value="EASY">EASY (Low)</option>
+                <option value="NORMAL">NORMAL (Med)</option>
+                <option value="HARD">HARD (High)</option>
+                <option value="CHAOS">CHAOS (Max)</option>
+              </select>
+
+              <label id="dbg-lbl-bullet-pat">Pattern:</label>
+              <select id="dbg-bullet-pat-select" class="dbg-select">
+                <option value="stream">Basic Stream</option>
+                <option value="fan">Fan Shot</option>
+                <option value="side">Side Pressure</option>
+                <option value="falling">Falling Files</option>
+                <option value="laser">Warning Laser</option>
+                <option value="bouncer">Bouncing Error</option>
+              </select>
+              <button class="win98-btn btn-xs" id="dbg-bullet-pat-test-btn">Test Pattern</button>
+              <button class="win98-btn btn-xs" id="dbg-clear-hazards-btn">Clear Bullets</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health Items & Visuals Test -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-health">💊 HEALTH ITEMS & VISUAL FEEDBACK</strong>
+            <span id="dbg-lbl-drop-rate" style="font-size: 10px; color: #555;">Drop: 40% base / 65% clean</span>
+          </div>
+          <div class="dbg-btn-group" style="margin-top: 4px;">
+            <button class="win98-btn btn-xs" id="dbg-spawn-hp-btn">Spawn HP_FIX.EXE</button>
+            <button class="win98-btn btn-xs" id="dbg-clear-hp-btn">Remove Pickups</button>
+            <button class="win98-btn btn-xs" id="dbg-test-clear-effect-btn">Test CLEAR Effect</button>
+            <button class="win98-btn btn-xs" id="dbg-combo5-btn">+5 Streak</button>
+          </div>
+        </div>
+
+        <!-- Localization & String Verification -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-loc">🌐 LOCALIZATION & TEXT VERIFICATION</strong>
+            <div class="dbg-btn-group">
+              <button class="win98-btn btn-xs" id="dbg-lang-en-btn">EN</button>
+              <button class="win98-btn btn-xs" id="dbg-lang-ko-btn">한국어</button>
+              <button class="win98-btn btn-xs" id="dbg-test-all-text-btn">Test Text Modal</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Monospace Debug Log -->
+        <div class="dbg-section win98-box-inset">
+          <div class="dbg-header">
+            <strong id="dbg-hdr-log">📜 LIVE DEBUG LOG (MAX 30)</strong>
+            <button class="win98-btn btn-xs" id="dbg-clear-log-btn">Clear Log</button>
+          </div>
+          <div class="dbg-log-console" id="dbg-log-console">
+            <div class="dbg-log-entry dbg-log-info">Debug Toolkit initialized. Press F2 to toggle.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Windows Taskbar -->
+    <div class="win98-taskbar" id="taskbar">
+      <button class="win98-start-btn" id="btn-start">
+        <span class="start-flag">🪟</span>
+        <strong id="btn-start-text">Start</strong>
+      </button>
+      <div class="taskbar-divider"></div>
+      <div class="taskbar-tasks">
+        <div class="taskbar-item win98-box-inset">
+          <span class="task-icon">⚠️</span>
+          <span class="task-name">DO NOT PLAY THIS GAME</span>
+        </div>
+      </div>
+      <div class="taskbar-tray win98-box-inset">
+        <button class="tray-btn" id="btn-fullscreen-toggle" title="Toggle Fullscreen">⛶</button>
+        <button class="tray-btn tray-sound-btn" id="btn-sound-toggle" title="Toggle Sound">🔊</button>
+        <span class="tray-clock" id="tray-clock">12:00 PM</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Script Files in Load Order -->
+  <script src="js/localization.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/hazards.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

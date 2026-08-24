@@ -1,0 +1,1399 @@
+/**
+ * DO NOT PLAY THIS GAME — Retro Windows 95/98 Styling & Layout (Beta v0.4)
+ * Pure authentic retro aesthetics. No modern glassmorphism or SaaS rounded corners.
+ */
+
+/* ==========================================================================
+   Color Palette & Variables
+   ========================================================================== */
+:root {
+  --win-gray: #c0c0c0;
+  --win-gray-light: #dfdfdf;
+  --win-gray-dark: #808080;
+  --win-black: #000000;
+  --win-white: #ffffff;
+  --win-blue: #000080;
+  --win-blue-light: #1084d0;
+  --win-teal: #008080;
+  --win-red: #cc0000;
+  --win-yellow: #ffff00;
+  --font-system: 'MS Sans Serif', 'Tahoma', 'Malgun Gothic', 'Dotum', 'Apple SD Gothic Neo', sans-serif;
+  --font-mono: 'Lucida Console', 'Courier New', 'D2Coding', 'Malgun Gothic', monospace;
+  --font-pixel: 'Press Start 2P', 'Lucida Console', monospace;
+}
+
+/* Reset & Global */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-system);
+  font-size: 12px;
+  background-color: var(--win-teal);
+  image-rendering: pixelated;
+}
+
+/* ==========================================================================
+   Windows 95/98 Bevel Helper Classes
+   ========================================================================== */
+.win98-box-outset {
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+  box-shadow: inset 1px 1px 0px var(--win-gray-light), inset -1px -1px 0px var(--win-gray-dark);
+}
+
+.win98-box-inset {
+  background-color: #ffffff;
+  border-top: 2px solid var(--win-gray-dark);
+  border-left: 2px solid var(--win-gray-dark);
+  border-right: 2px solid var(--win-white);
+  border-bottom: 2px solid var(--win-white);
+  box-shadow: inset 1px 1px 0px var(--win-black);
+}
+
+.win98-btn {
+  font-family: var(--font-system);
+  font-size: 11px;
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+  box-shadow: inset 1px 1px 0px var(--win-gray-light), inset -1px -1px 0px var(--win-gray-dark);
+  padding: 3px 10px;
+  cursor: pointer;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.win98-btn:active {
+  border-top: 2px solid var(--win-black);
+  border-left: 2px solid var(--win-black);
+  border-right: 2px solid var(--win-white);
+  border-bottom: 2px solid var(--win-white);
+  padding: 4px 9px 2px 11px;
+  box-shadow: inset 1px 1px 0px var(--win-gray-dark);
+}
+
+.win98-btn.btn-sm {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.win98-btn.btn-disabled {
+  color: var(--win-gray-dark);
+  text-shadow: 1px 1px 0px var(--win-white);
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Desktop Environment
+   ========================================================================== */
+.desktop-wallpaper {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background-color: var(--win-teal);
+  display: flex;
+  flex-direction: column;
+}
+
+.desktop-icons-container {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 1;
+}
+
+.desktop-icon {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.desktop-icon .icon-img {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.desktop-icon .icon-label {
+  color: #ffffff;
+  font-size: 11px;
+  text-align: center;
+  text-shadow: 1px 1px 1px #000000;
+  padding: 1px 3px;
+  word-break: break-word;
+}
+
+.desktop-icon.icon-selected .icon-label {
+  background-color: var(--win-blue);
+}
+
+.icon-computer::after { content: '🖥️'; }
+.icon-txt::after { content: '📄'; }
+.icon-trash::after { content: '🗑️'; }
+.icon-exe::after { content: '⚠️'; }
+
+/* ==========================================================================
+   Main Game Window
+   ========================================================================== */
+.win98-window {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% - 14px));
+  width: 656px;
+  background-color: var(--win-gray);
+  z-index: 10;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.win98-titlebar {
+  background: linear-gradient(90deg, var(--win-blue), var(--win-blue-light));
+  height: 22px;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.titlebar-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.titlebar-btn {
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  font-size: 9px;
+  font-weight: bold;
+}
+
+.win98-menubar {
+  background-color: var(--win-gray);
+  border-bottom: 1px solid var(--win-gray-dark);
+  display: flex;
+  padding: 2px 6px;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.menubar-item {
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Game Viewport & Canvas
+   ========================================================================== */
+.game-viewport-wrapper {
+  padding: 4px;
+  background-color: var(--win-gray);
+}
+
+.game-canvas-container {
+  position: relative;
+  width: 640px;
+  height: 440px;
+  background-color: #000000;
+  border-top: 2px solid var(--win-gray-dark);
+  border-left: 2px solid var(--win-gray-dark);
+  border-right: 2px solid var(--win-white);
+  border-bottom: 2px solid var(--win-white);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.game-canvas-container.malfunction-shrunk {
+  transform: scale(0.72);
+  border: 3px dashed var(--win-yellow);
+}
+
+#gameCanvas {
+  display: block;
+  width: 640px;
+  height: 440px;
+}
+
+/* ==========================================================================
+   Event Warning Telegraph (0.8s) & Instruction Banners
+   ========================================================================== */
+.event-warning-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #cc0000;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 900;
+  padding: 6px 20px;
+  border: 2px solid #ffffff;
+  box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.8);
+  z-index: 55;
+  white-space: nowrap;
+  animation: warning-flash 0.18s infinite alternate;
+}
+
+@keyframes warning-flash {
+  0% { background-color: #cc0000; transform: translateX(-50%) scale(1.0); }
+  100% { background-color: #ff5500; transform: translateX(-50%) scale(1.05); }
+}
+
+.event-instruction-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #000080;
+  border: 2px solid #ffffff;
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8);
+  color: #ffff00;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 4px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 50;
+  white-space: nowrap;
+}
+
+.event-timer-bar-wrap {
+  width: 70px;
+  height: 8px;
+  background-color: #222222;
+  border: 1px solid #ffffff;
+  overflow: hidden;
+  margin-left: 6px;
+}
+
+.event-timer-bar {
+  height: 100%;
+  width: 100%;
+  background-color: #00ff00;
+  transition: width 0.05s linear;
+}
+
+.event-feedback-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #00aa00;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 900;
+  padding: 10px 30px;
+  border: 3px solid #ffffff;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.9);
+  z-index: 52;
+  animation: toast-pop 0.5s ease-out forwards;
+}
+
+.combo-milestone-toast {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #000080;
+  color: #00ffff;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 900;
+  padding: 8px 24px;
+  border: 2px solid #00ffff;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.9);
+  z-index: 54;
+  white-space: nowrap;
+  animation: milestone-pop 1.2s ease-out forwards;
+}
+
+@keyframes milestone-pop {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  20% { transform: translate(-50%, -60%) scale(1.15); opacity: 1; }
+  80% { transform: translate(-50%, -65%) scale(1.0); opacity: 1; }
+  100% { transform: translate(-50%, -85%) scale(0.9); opacity: 0; }
+}
+
+@keyframes toast-pop {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  30% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.9; }
+}
+
+/* Pop-up Hell Dialogs */
+.popup-hell-dialog {
+  position: absolute;
+  width: 220px;
+  background-color: var(--win-gray);
+  box-shadow: 3px 3px 0px rgba(0,0,0,0.8);
+}
+
+.popup-titlebar {
+  background: linear-gradient(90deg, var(--win-blue), var(--win-blue-light));
+  height: 18px;
+  padding: 1px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.popup-close-btn {
+  background: var(--win-gray);
+  border: 1px solid #000000;
+  font-size: 9px;
+  width: 14px;
+  height: 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.popup-body {
+  padding: 8px;
+  font-size: 11px;
+}
+
+/* Fake Update Dialog */
+.fake-update-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 380px;
+  background-color: var(--win-gray);
+  z-index: 45;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.8);
+}
+
+.update-dialog-body {
+  padding: 16px;
+}
+
+.update-icon-row {
+  display: flex;
+  gap: 16px;
+}
+
+.update-hourglass-icon {
+  font-size: 32px;
+}
+
+.update-text-area {
+  flex: 1;
+}
+
+.update-progress-outer {
+  height: 16px;
+  background-color: #ffffff;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background-color: var(--win-blue);
+  transition: width 0.2s ease;
+}
+
+.update-pct-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.update-subnote {
+  color: #666666;
+}
+
+/* No Signal CRT Overlay */
+.no-signal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.45) 0px,
+    rgba(0, 0, 0, 0.45) 2px,
+    rgba(255, 255, 255, 0.15) 2px,
+    rgba(255, 255, 255, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-signal-tag {
+  background-color: #000080;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 900;
+  padding: 6px 16px;
+  border: 2px solid #ffffff;
+}
+
+/* Title Drop Obstacle (Event 14) */
+.title-drop-obstacle {
+  position: absolute;
+  left: 40px;
+  width: 560px;
+  height: 24px;
+  z-index: 42;
+  box-shadow: 0px 4px 6px rgba(0,0,0,0.7);
+  animation: drop-bounce 0.4s ease-out;
+}
+
+@keyframes drop-bounce {
+  0% { transform: translateY(-80px); }
+  70% { transform: translateY(10px); }
+  100% { transform: translateY(0); }
+}
+
+/* Taskbar Malfunction Rising (Event 15) */
+.taskbar-rise-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: var(--win-gray);
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  color: #cc0000;
+  transition: height 0.4s ease-out;
+}
+
+/* Notification Spam Toasts (Event: Notification Spam) */
+.notification-spam-toast {
+  position: absolute;
+  width: 180px;
+  background-color: #ffffe1;
+  border: 1px solid #000000;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+  padding: 6px 8px;
+  z-index: 46;
+  font-family: var(--font-system);
+  font-size: 11px;
+  pointer-events: none;
+  animation: notif-slide-in 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+.notification-spam-title {
+  font-weight: bold;
+  color: #000080;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.notification-spam-msg {
+  color: #222222;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+@keyframes notif-slide-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1.0); opacity: 1; }
+}
+
+/* Fake Retro Scrollbars (Event: Scrollbar Malfunction) */
+.fake-retro-scrollbar-v {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 100%;
+  background-color: #dfdfdf;
+  border-left: 2px solid var(--win-gray-dark);
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+}
+
+.fake-retro-scrollbar-h {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  background-color: #dfdfdf;
+  border-top: 2px solid var(--win-gray-dark);
+  z-index: 45;
+  display: flex;
+  flex-direction: row;
+  transition: height 0.3s ease;
+}
+
+.sb-arrow-btn {
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #000000;
+  width: 100%;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.fake-retro-scrollbar-h .sb-arrow-btn {
+  width: 20px;
+  height: 100%;
+}
+
+.sb-track {
+  flex: 1;
+  background: repeating-conic-gradient(#c0c0c0 0% 25%, #ffffff 0% 50%) 50% / 2px 2px;
+  position: relative;
+}
+
+.sb-track-h {
+  flex: 1;
+  background: repeating-conic-gradient(#c0c0c0 0% 25%, #ffffff 0% 50%) 50% / 2px 2px;
+  position: relative;
+}
+
+.sb-thumb {
+  position: absolute;
+  top: 20%;
+  left: 1px;
+  right: 1px;
+  height: 40px;
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+}
+
+.sb-thumb-h {
+  position: absolute;
+  left: 20%;
+  top: 1px;
+  bottom: 1px;
+  width: 40px;
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+}
+
+/* Window Ghost Clone (Event: Window Ghost) */
+.window-ghost-clone {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.4;
+  filter: blur(0.5px);
+  z-index: 30;
+  border: 2px solid #000080;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s linear;
+}
+
+/* S-Rank & Exit Refusal Dialogs */
+.s-rank-dialog, .exit-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background-color: var(--win-gray);
+  z-index: 70;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.8);
+}
+
+.s-rank-body, .exit-dialog-body {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.s-rank-trophy, .error-dialog-icon {
+  font-size: 32px;
+}
+
+.exit-dialog-actions {
+  padding: 0 16px 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ==========================================================================
+   Screen Overlays (Title, Game Over, Pause)
+   ========================================================================== */
+.win98-screen-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.title-content-box, .gameover-content-box, .pause-box {
+  width: 440px;
+  background-color: var(--win-gray);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.gameover-content-box {
+  padding: 0;
+  width: 420px;
+}
+
+.gameover-titlebar, .pause-titlebar {
+  background: linear-gradient(90deg, #800000, #cc0000);
+  height: 22px;
+  width: 100%;
+  padding: 2px 6px;
+  color: #ffffff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.gameover-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.title-warning-icon, .gameover-skull {
+  font-size: 36px;
+  margin-bottom: 4px;
+}
+
+.game-title, .gameover-heading {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--win-red);
+  margin-bottom: 4px;
+}
+
+.game-subtitle, .gameover-subtext {
+  font-size: 11px;
+  color: #333333;
+  margin-bottom: 14px;
+}
+
+.title-btn-group, .gameover-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.play-btn, .replay-btn {
+  min-width: 110px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.exit-btn {
+  min-width: 80px;
+  height: 32px;
+}
+
+.title-records-box {
+  width: 100%;
+  background-color: #ffffff;
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.record-val {
+  color: #000080;
+}
+
+.record-badge, .rank-badge {
+  color: #cc0000;
+  background-color: #ffff99;
+  border: 1px solid #000000;
+  padding: 1px 8px;
+  font-weight: 900;
+}
+
+.title-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.title-instructions {
+  font-size: 10px;
+  color: #555555;
+}
+
+.gameover-stats {
+  width: 100%;
+  background-color: #ffffff;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.stat-divider {
+  height: 1px;
+  background-color: var(--win-gray-dark);
+  margin: 6px 0;
+}
+
+.stat-rank-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rank-comment {
+  margin-top: 4px;
+  font-style: italic;
+  color: #666666;
+  text-align: center;
+}
+
+.text-gold { color: #cc9900; font-weight: bold; }
+.text-cyan { color: #0088cc; font-weight: bold; }
+
+/* Pause Screen */
+.pause-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Window Status Bar & HUD
+   ========================================================================== */
+.win98-statusbar {
+  background-color: var(--win-gray);
+  padding: 3px 4px;
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.status-panel {
+  padding: 2px 6px;
+  background-color: var(--win-gray);
+  border-top: 1px solid var(--win-gray-dark);
+  border-left: 1px solid var(--win-gray-dark);
+  border-right: 1px solid var(--win-white);
+  border-bottom: 1px solid var(--win-white);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.status-msg {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #000080;
+  font-weight: bold;
+}
+
+.status-combo {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  color: #000080;
+  width: 90px;
+}
+
+.status-time, .status-score {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  width: 90px;
+}
+
+.status-hp-container {
+  width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hp-label {
+  font-weight: bold;
+}
+
+.hp-bar-outer {
+  flex: 1;
+  height: 12px;
+  background-color: #222222;
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  background-color: #00cc00;
+  transition: width 0.15s ease;
+}
+
+.hp-bar-fill.hp-warning { background-color: #ffcc00; }
+.hp-bar-fill.hp-danger { background-color: #ff2222; }
+
+.hp-number {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: bold;
+  width: 24px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   Desktop Taskbar
+   ========================================================================== */
+.win98-taskbar {
+  width: 100vw;
+  height: 28px;
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  gap: 4px;
+  z-index: 100;
+}
+
+.win98-start-btn {
+  height: 22px;
+  font-family: var(--font-system);
+  font-size: 11px;
+  background-color: var(--win-gray);
+  border-top: 2px solid var(--win-white);
+  border-left: 2px solid var(--win-white);
+  border-right: 2px solid var(--win-black);
+  border-bottom: 2px solid var(--win-black);
+  padding: 1px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.taskbar-divider {
+  width: 2px;
+  height: 20px;
+  border-left: 1px solid var(--win-gray-dark);
+  border-right: 1px solid var(--win-white);
+}
+
+.taskbar-tasks {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.taskbar-item {
+  width: 180px;
+  height: 22px;
+  background-color: #d8d8d8;
+  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.task-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskbar-tray {
+  height: 22px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  background-color: var(--win-gray);
+}
+
+.tray-sound-btn, .tray-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tray-btn:hover {
+  filter: brightness(1.2);
+}
+
+/* ==========================================================================
+   Retro Boot Sequence Screen (Demo v0.5)
+   ========================================================================== */
+.boot-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000;
+  color: #00ff00;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 40px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  cursor: pointer;
+}
+
+.boot-terminal-content {
+  max-width: 600px;
+}
+
+.boot-line {
+  margin-bottom: 8px;
+  min-height: 22px;
+}
+
+.boot-skip-hint {
+  margin-top: 30px;
+  color: #666666;
+  font-size: 12px;
+}
+
+.boot-scanlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Start Countdown Overlay (3, 2, 1, SURVIVE!)
+   ========================================================================== */
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.countdown-text {
+  font-family: var(--font-mono);
+  font-size: 64px;
+  font-weight: 900;
+  color: #ffff00;
+  text-shadow: 3px 3px 0px #000000;
+  animation: countdown-pulse 0.25s ease-out;
+}
+
+.countdown-subtext {
+  font-family: var(--font-system);
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-top: 10px;
+  letter-spacing: 1px;
+}
+
+@keyframes countdown-pulse {
+  0% { transform: scale(0.6); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1.0); opacity: 1; }
+}
+
+/* ==========================================================================
+   Fatal Error Dialog (HP 0 Transition)
+   ========================================================================== */
+.fatal-error-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background-color: var(--win-gray);
+  z-index: 80;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.9);
+  animation: toast-pop 0.3s ease-out;
+}
+
+.fatal-titlebar {
+  background: linear-gradient(90deg, #880000, #cc0000) !important;
+}
+
+.fatal-dialog-body {
+  padding: 18px 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.fatal-ok-btn {
+  min-width: 70px;
+  font-weight: bold;
+}
+
+/* ==========================================================================
+   Developer Debug Toolkit (F2 / Win98 Architecture)
+   ========================================================================== */
+.debug-window {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 380px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background-color: var(--win-gray);
+  z-index: 250;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.85);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0.96;
+  transition: opacity 0.2s ease;
+}
+
+.debug-window .popup-titlebar {
+  cursor: grab;
+  user-select: none;
+}
+
+.debug-window .popup-titlebar:active {
+  cursor: grabbing;
+}
+
+.debug-window.opacity-70 {
+  opacity: 0.70;
+}
+
+.debug-window.opacity-40 {
+  opacity: 0.40;
+}
+
+.debug-window.is-minimized {
+  width: 250px;
+}
+
+.debug-window.is-minimized .debug-body {
+  display: none !important;
+}
+
+.debug-window.dock-compact {
+  width: 320px;
+  max-height: 48vh;
+}
+
+.dbg-toolkit-container {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  overflow-y: auto;
+  max-height: calc(90vh - 30px);
+}
+
+.dbg-section {
+  padding: 5px 6px;
+  background-color: #dfded7;
+}
+
+.dbg-global-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.dbg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #a09d94;
+  font-size: 10.5px;
+}
+
+.dbg-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+  font-size: 10.5px;
+}
+
+.dbg-val {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  color: #000080;
+}
+
+.dbg-val-bold {
+  font-family: var(--font-mono);
+  font-weight: 900;
+  color: #a00000;
+}
+
+.dbg-filter-controls {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.dbg-input, .dbg-select {
+  font-family: var(--font-system);
+  font-size: 10px;
+  padding: 1px 3px;
+  background-color: #ffffff;
+  border: 1px solid #7f9db9;
+}
+
+.dbg-event-table-wrap {
+  max-height: 150px;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border: 1px solid #7f9db9;
+}
+
+.dbg-event-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.dbg-event-table th {
+  background-color: #e0ded8;
+  padding: 2px 4px;
+  text-align: left;
+  border-bottom: 1px solid #999;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dbg-event-table td {
+  padding: 2px 4px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.dbg-event-table tr:hover {
+  background-color: #edf3fa;
+}
+
+.dbg-event-table tr.row-active {
+  background-color: #d8ffd8;
+  font-weight: bold;
+}
+
+.dbg-event-table tr.row-error {
+  background-color: #ffd8d8;
+.dbg-cat-badge {
+  font-size: 8.5px;
+  font-weight: bold;
+  padding: 1px 3px;
+  background-color: #333;
+  color: #fff;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.badge-cat-attack { background-color: #c00000; color: #fff; }
+.badge-cat-vision { background-color: #555588; color: #fff; }
+.badge-cat-input { background-color: #884488; color: #fff; }
+.badge-cat-space { background-color: #006688; color: #fff; }
+.badge-cat-window { background-color: #337733; color: #fff; }
+.badge-cat-visual { background-color: #775533; color: #fff; }
+
+.dbg-status-badge {
+  font-size: 8.5px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 2px;
+  display: inline-block;
+  text-align: center;
+  min-width: 44px;
+}
+
+.badge-ready {
+  background-color: #d0cfc9;
+  color: #333;
+}
+
+.badge-active {
+  background-color: #00aa00;
+  color: #ffffff;
+  animation: pulse-badge 1s infinite alternate;
+}
+
+.badge-ending {
+  background-color: #e68a00;
+  color: #ffffff;
+}
+
+.badge-error {
+  background-color: #cc0000;
+  color: #ffffff;
+}
+
+@keyframes pulse-badge {
+  0% { opacity: 0.8; }
+  100% { opacity: 1; filter: brightness(1.2); }
+}
+
+.dbg-queue-container {
+  max-height: 60px;
+  overflow-y: auto;
+  background-color: #121212;
+  color: #00ff66;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 6px;
+  border: 1px inset #888;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+.dbg-log-console {
+  max-height: 85px;
+  overflow-y: auto;
+  background-color: #0c0c0c;
+  color: #d0d0d0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 4px 6px;
+  border: 1px inset #888;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dbg-log-entry {
+  line-height: 1.25;
+  word-break: break-all;
+}
+
+.dbg-log-info { color: #88aacc; }
+.dbg-log-start { color: #00ffff; font-weight: bold; }
+.dbg-log-end { color: #00ff88; }
+.dbg-log-error { color: #ff5555; font-weight: bold; }
+.dbg-log-warn { color: #ffcc00; }
+
+.btn-danger-hint:hover {
+  background-color: #ffcccc !important;
+  color: #aa0000 !important;
+}
+
+.btn-xs {
+  font-size: 9.5px;
+  padding: 1px 4px;
+}
