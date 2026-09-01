@@ -11,6 +11,20 @@
 
 ---
 
+# 🌐 Play
+
+게임은 GitHub Pages를 통해 바로 플레이할 수 있습니다.
+
+**[🎮 Play Do Not Play This Game](https://ilegood.github.io/Do-Not-Play-This-Game/)**
+
+별도의 설치나 빌드 과정 없이 브라우저에서 실행할 수 있습니다.
+
+---
+
+# 🔗 Repository
+
+**[GitHub - Do Not Play This Game](https://github.com/ilegood/Do-Not-Play-This-Game)**
+
 ## 📌 Project Overview
 
 | 항목 | 내용 |
@@ -49,3 +63,14 @@
        ▼       ▼       ▼
       UI     Input    Space
    Disruption Disruption Disruption
+
+# 📚 What I Learned
+
+- HTML5 Canvas를 활용한 게임 렌더링
+- JavaScript 기반 게임 루프 구현
+- 탄막 생성 및 충돌 처리
+- 이벤트 기반 게임 플레이 구조 설계
+- 확장 가능한 콘텐츠 구조 설계
+- Debug Toolkit을 활용한 기능 테스트 및 밸런싱
+- Web Audio API를 활용한 브라우저 사운드 구현
+- HTML / CSS / JavaScript만을 활용한 게임 개발
